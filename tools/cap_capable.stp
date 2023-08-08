@@ -1,0 +1,17 @@
+#!/usr/bin/env stap
+
+probe kernel.function("cap_capable").return {
+  mnt_ns = @cast(task_current(), "struct task_struct")->nsproxy->mnt_ns
+  inum = @cast(mnt_ns, "struct mnt_namespace")->ns->inum
+
+  if (inum == 4026533394) {
+    printf("-----------------------\n")
+    cred = @cast(task_current(), "struct task_struct")->cred
+    effective0 = @cast(cred, "struct cred")->cap_effective->cap[0]
+    effective1 = @cast(cred, "struct cred")->cap_effective->cap[1]
+    printf("request cap: 0x%x\n", @entry($cap))
+    printf("current cap_effective: 0x%x%x\n", effective1, effective0)
+    printf("return: 0x%x\n", $return)
+    print_backtrace()
+  }
+}
