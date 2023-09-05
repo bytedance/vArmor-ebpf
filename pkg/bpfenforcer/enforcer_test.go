@@ -78,7 +78,7 @@ func Test_VarmorCapable(t *testing.T) {
 	stopTicker = time.NewTicker(5 * time.Second)
 	<-stopTicker.C
 
-	// err = fmt.Errorf("111")
+	// err = fmt.Errorf("forced error")
 	// assert.NilError(t, err)
 }
 
@@ -192,8 +192,7 @@ func Test_VarmorFileRule(t *testing.T) {
 	defer tracer.StopEnforcing()
 
 	// host mnt ns id: 4026531840
-	// match /tmp/33**, /**/33, /tmp/**/33,
-	// rule, err := newBpfPathRule("/etc/**", AA_MAY_WRITE|AA_MAY_APPEND)
+	// match /tmp/33**, /**/33, /tmp/**/33, /etc/**,
 	rule, err := newBpfPathRule("/**/hostname", AA_MAY_WRITE|AA_MAY_APPEND)
 	assert.NilError(t, err)
 
@@ -203,7 +202,7 @@ func Test_VarmorFileRule(t *testing.T) {
 	stopTicker := time.NewTicker(90 * time.Second)
 	<-stopTicker.C
 
-	// err = fmt.Errorf("111")
+	// err = fmt.Errorf("forced error")
 	// assert.NilError(t, err)
 }
 
@@ -227,7 +226,7 @@ func Test_VarmorBprmCheckSecurity(t *testing.T) {
 	stopTicker := time.NewTicker(90 * time.Second)
 	<-stopTicker.C
 
-	// err = fmt.Errorf("111")
+	// err = fmt.Errorf("forced error")
 	// assert.NilError(t, err)
 }
 
@@ -373,6 +372,27 @@ func Test_VarmorNetCheckSecurity(t *testing.T) {
 	stopTicker := time.NewTicker(90 * time.Second)
 	<-stopTicker.C
 
-	// err = fmt.Errorf("111")
+	// err = fmt.Errorf("forced error")
+	// assert.NilError(t, err)
+}
+
+func Test_VarmorPtraceAccessCheck(t *testing.T) {
+	log.SetLogger(klogr.New())
+	tracer := NewBpfEnforcer(log.Log.WithName("ebpf"))
+	err := tracer.InitEBPF()
+	assert.NilError(t, err)
+	defer tracer.RemoveEBPF()
+
+	err = tracer.StartEnforcing()
+	assert.NilError(t, err)
+	defer tracer.StopEnforcing()
+
+	rule := newBpfPtraceRule(AA_MAY_BE_READ, GREEDY_MATCH)
+	tracer.SetPtraceMap(4026533400, rule)
+
+	stopTicker := time.NewTicker(90 * time.Second)
+	<-stopTicker.C
+
+	// err = fmt.Errorf("forced error")
 	// assert.NilError(t, err)
 }
