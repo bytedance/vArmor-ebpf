@@ -10,8 +10,12 @@
 #include "file.h"
 #include "process.h"
 #include "network.h"
+#include "ptrace.h"
 
 char __license[] SEC("license") = "GPL";
+
+// Save the mnt ns id of init task
+volatile const u32 init_mnt_ns;
 
 // Tail call map (program array) initialized with program pointers.
 struct {
@@ -268,4 +272,31 @@ int BPF_PROG(varmor_socket_connect, struct socket *sock, struct sockaddr *addres
 
   // Iterate all rules in the inner map
   return iterate_net_inner_map(vnet_inner, address);
+}
+
+SEC("lsm/ptrace_access_check")
+int BPF_PROG(varmor_ptrace_access_check, struct task_struct *child, unsigned int mode) {
+  // Retrieve the current task
+  struct task_struct *current = (struct task_struct *)bpf_get_current_task();
+  u32 current_mnt_ns = get_task_mnt_ns_id(current);
+  u32 child_mnt_ns = get_task_mnt_ns_id(child);
+  
+  // Whether the current task has ptrace access control rule
+  u64 *rule = get_ptrace_rule(current_mnt_ns);
+  if (rule != 0) {
+    DEBUG_PRINT("================ lsm/ptrace_access_check ================");
+    if (!ptrace_permission_check(current_mnt_ns, child_mnt_ns, *rule, (mode & PTRACE_MODE_READ) ? AA_PTRACE_READ : AA_PTRACE_TRACE))
+      return -EPERM;
+  }
+
+  // Whether the child task has ptrace access control rule
+  // We allow tasks from the init mnt ns by default
+  rule = get_ptrace_rule(child_mnt_ns);
+  if (current_mnt_ns != init_mnt_ns && rule != 0) {
+    DEBUG_PRINT("================ lsm/ptrace_access_check ================");
+    if (!ptrace_permission_check(current_mnt_ns, child_mnt_ns, *rule, (mode & PTRACE_MODE_READ) ? AA_MAY_BE_READ : AA_MAY_BE_TRACED))
+      return -EPERM;
+  }
+
+  return 0;
 }

@@ -21,6 +21,8 @@ import "C"
 import (
 	"fmt"
 	"net"
+	"os"
+	"strconv"
 	"strings"
 
 	"github.com/cilium/ebpf"
@@ -47,6 +49,10 @@ const (
 	AA_MAY_WRITE           = 0x00000002
 	AA_MAY_READ            = 0x00000004
 	AA_MAY_APPEND          = 0x00000008
+	AA_PTRACE_TRACE        = 0x00000002
+	AA_PTRACE_READ         = 0x00000004
+	AA_MAY_BE_TRACED       = 0x00000008
+	AA_MAY_BE_READ         = 0x00000010
 )
 
 type bpfPathRule struct {
@@ -72,6 +78,7 @@ type BpfEnforcer struct {
 	pathRenameLink  link.Link
 	bprmLink        link.Link
 	sockConnLink    link.Link
+	ptraceLink      link.Link
 	log             logr.Logger
 }
 
@@ -82,6 +89,27 @@ func NewBpfEnforcer(log logr.Logger) *BpfEnforcer {
 	}
 
 	return &enforcer
+}
+
+func readMntNsID(pid uint32) (uint32, error) {
+	path := fmt.Sprintf("/proc/%d/ns/mnt", pid)
+	realPath, err := os.Readlink(path)
+	if err != nil {
+		return 0, err
+	}
+
+	index := strings.Index(realPath, "[")
+	if index == -1 {
+		return 0, fmt.Errorf(fmt.Sprintf("fatel error: can not parser mnt ns id from: %s", realPath))
+	}
+
+	id := realPath[index+1 : len(realPath)-1]
+	u64, err := strconv.ParseUint(id, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf(fmt.Sprintf("fatel error: can not transform mnt ns id (%s) to uint64 type", realPath))
+	}
+
+	return uint32(u64), nil
 }
 
 func (enforcer *BpfEnforcer) InitEBPF() error {
@@ -123,6 +151,16 @@ func (enforcer *BpfEnforcer) InitEBPF() error {
 		MaxEntries: MAX_NET_INNER_ENTRIES,
 	}
 	collectionSpec.Maps["v_net_outer"].InnerMap = &netInnerMap
+
+	initMntNsId, err := readMntNsID(1)
+	if err != nil {
+		return err
+	}
+
+	// Set the mnt ns id to the BPF program
+	collectionSpec.RewriteConstants(map[string]interface{}{
+		"init_mnt_ns": initMntNsId,
+	})
 
 	// Load pre-compiled programs and maps into the kernel.
 	enforcer.log.Info("load ebpf program and maps into the kernel")
@@ -202,6 +240,14 @@ func (enforcer *BpfEnforcer) StartEnforcing() error {
 	}
 	enforcer.sockConnLink = sockConnLink
 
+	ptraceLink, err := link.AttachLSM(link.LSMOptions{
+		Program: enforcer.objs.VarmorPtraceAccessCheck,
+	})
+	if err != nil {
+		return err
+	}
+	enforcer.ptraceLink = ptraceLink
+
 	enforcer.log.Info("start enforcing")
 
 	return nil
@@ -236,6 +282,10 @@ func (enforcer *BpfEnforcer) StopEnforcing() {
 
 	if enforcer.sockConnLink != nil {
 		enforcer.sockConnLink.Close()
+	}
+
+	if enforcer.ptraceLink != nil {
+		enforcer.ptraceLink.Close()
 	}
 }
 
@@ -480,4 +530,16 @@ func (enforcer *BpfEnforcer) SetNetMap(mntNsID uint32, networkRule *bpfNetworkRu
 
 func (enforcer *BpfEnforcer) ClearNetMap(mntNsID uint32) error {
 	return enforcer.objs.V_netOuter.Delete(&mntNsID)
+}
+
+func newBpfPtraceRule(permissions uint32, flags uint32) uint64 {
+	return uint64(permissions)<<32 + uint64(flags)
+}
+
+func (enforcer *BpfEnforcer) SetPtraceMap(mntNsID uint32, ptraceRule uint64) error {
+	return enforcer.objs.V_ptrace.Put(&mntNsID, &ptraceRule)
+}
+
+func (enforcer *BpfEnforcer) ClearPtraceMap(mntNsID uint32) error {
+	return enforcer.objs.V_ptrace.Delete(&mntNsID)
 }

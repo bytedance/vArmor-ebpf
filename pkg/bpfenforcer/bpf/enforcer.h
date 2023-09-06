@@ -15,14 +15,14 @@
 #define FILE_PATH_PATTERN_SIZE_MAX 64
 #define BUFFER_MAX 4096*3
 
-#define PRECISE_MATCH 0x1
-#define GREEDY_MATCH 0x2
-#define PREFIX_MATCH 0x4
-#define SUFFIX_MATCH 0x8
-#define CIDR_MATCH 0x00000020
-#define IPV4_MATCH 0x00000040
-#define IPV6_MATCH 0x00000080
-#define PORT_MATCH 0x00000100
+#define PRECISE_MATCH 0x00000001
+#define GREEDY_MATCH  0x00000002
+#define PREFIX_MATCH  0x00000004
+#define SUFFIX_MATCH  0x00000008
+#define CIDR_MATCH    0x00000020
+#define IPV4_MATCH    0x00000040
+#define IPV6_MATCH    0x00000080
+#define PORT_MATCH    0x00000100
 
 #undef container_of
 #define container_of(ptr, type, member)                                        \
