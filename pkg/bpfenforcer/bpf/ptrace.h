@@ -37,8 +37,7 @@ static __always_inline bool ptrace_permission_check(u32 current_mnt_ns, u32 chil
     }
 
     // only deny tasks outside the container
-    if (flags & PRECISE_MATCH && current_mnt_ns != child_mnt_ns)
-    {
+    if (flags & PRECISE_MATCH && current_mnt_ns != child_mnt_ns) {
       DEBUG_PRINT("access denied");
       return false;
     }
