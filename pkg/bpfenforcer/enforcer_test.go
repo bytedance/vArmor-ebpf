@@ -408,7 +408,7 @@ func Test_VarmorMountAccessCheck(t *testing.T) {
 	assert.NilError(t, err)
 	defer tracer.StopEnforcing()
 
-	rule, err := newBpfMountRule("/sys/fs/cgroup/devices", "*", 0, AA_MS_WRITE)
+	rule, err := newBpfMountRule("/sys/fs/cgroup/devices", "*", 0, unix.MS_RDONLY)
 	assert.NilError(t, err)
 
 	err = tracer.SetMountMap(4026532844, rule)

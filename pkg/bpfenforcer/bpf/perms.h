@@ -60,18 +60,6 @@
 #define MS_RELATIME	          (1<<21)	  /* Update atime relative to mtime/ctime. */
 #define MS_I_VERSION	        (1<<23)   /* Update inode I_version field */
 #define MS_STRICTATIME	      (1<<24)   /* Always perform atime updates */
-#define AA_MS_WRITE	          1	        /* Mount write or readwrite*/
-#define AA_MS_SUID	          2         /* Not ignore suid and sgid bits */
-#define AA_MS_DEV	            4	        /* Allow access to device special files */
-#define AA_MS_EXEC	          8	        /* Allow program execution */
-#define AA_MS_ASYNCHRONOUS    16        /* Writes are asynchronous */
-#define AA_MS_NOMANDLOCK	    64	      /* Disallow mandatory locks on an FS */
-#define AA_MS_ATIME           1024	    /* Update access times. */
-#define AA_MS_DIRATIME	      2048	    /* Update directory access times */
-#define AA_MS_LOUD            32768
-#define AA_MS_NORELATIME      (1<<21)	  /* Do not update atime relative to mtime/ctime. */
-#define AA_MS_NOI_VERSION     (1<<23)   /* Do not update inode I_version field */
-#define AA_MS_NO_STRICTATIME  (1<<24)   /* Disallow performing atime updates */
 
 // Command flags of mount syscall
 // https://elixir.bootlin.com/linux/v5.19.17/source/include/uapi/linux/mount.h
