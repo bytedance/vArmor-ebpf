@@ -54,18 +54,6 @@ const (
 	AA_PTRACE_READ          = 0x00000004
 	AA_MAY_BE_TRACED        = 0x00000008
 	AA_MAY_BE_READ          = 0x00000010
-	AA_MS_WRITE             = 0x00000001
-	AA_MS_SUID              = 0x00000002
-	AA_MS_DEV               = 0x00000004
-	AA_MS_EXEC              = 0x00000008
-	AA_MS_ASYNCHRONOUS      = 0x00000010
-	AA_MS_NOMANDLOCK        = 0x00000040
-	AA_MS_ATIME             = 0x00000400
-	AA_MS_DIRATIME          = 0x00000800
-	AA_MS_LOUD              = 0x00008000
-	AA_MS_NORELATIME        = 0x00200000
-	AA_MS_NOI_VERSION       = 0x00800000
-	AA_MS_NO_STRICTATIME    = 0x01000000
 )
 
 type bpfPathRule struct {
@@ -83,12 +71,12 @@ type bpfNetworkRule struct {
 }
 
 type bpfMountRule struct {
-	Flags         uint32
-	MountFlags    uint32
-	NegMountFlags uint32
-	FsType        [16]byte
-	Prefix        [64]byte
-	Suffix        [64]byte
+	Flags             uint32
+	MountFlags        uint32
+	ReverseMountFlags uint32
+	FsType            [16]byte
+	Prefix            [64]byte
+	Suffix            [64]byte
 }
 
 type BpfEnforcer struct {
@@ -588,7 +576,7 @@ func (enforcer *BpfEnforcer) ClearPtraceMap(mntNsID uint32) error {
 	return enforcer.objs.V_ptrace.Delete(&mntNsID)
 }
 
-func newBpfMountRule(sourcePattern string, fstype string, mountFlags uint32, negMountflags uint32) (*bpfMountRule, error) {
+func newBpfMountRule(sourcePattern string, fstype string, mountFlags uint32, reverseMountFlags uint32) (*bpfMountRule, error) {
 	// Pre-check
 	re, err := regexp2.Compile(`(?<!\*)\*(?!\*)`, regexp2.None)
 	if err != nil {
@@ -651,7 +639,7 @@ func newBpfMountRule(sourcePattern string, fstype string, mountFlags uint32, neg
 
 	mountRule.Flags = flags
 	mountRule.MountFlags = mountFlags
-	mountRule.NegMountFlags = negMountflags
+	mountRule.ReverseMountFlags = reverseMountFlags
 
 	var s [16]byte
 	copy(s[:], fstype)

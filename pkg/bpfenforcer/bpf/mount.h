@@ -25,7 +25,7 @@ struct {
 struct mount_rule {
   u32 flags;
   u32 mount_flags;
-  u32 neg_mount_flags;
+  u32 reverse_mount_flags;
   unsigned char fstype[FILE_SYSTEM_TYPE_MAX];
   unsigned char prefix[FILE_PATH_PATTERN_SIZE_MAX];
   unsigned char suffix[FILE_PATH_PATTERN_SIZE_MAX];
@@ -149,12 +149,12 @@ static __noinline int iterate_mount_inner_map(u32 *vmount_inner, unsigned long f
     }
 
     DEBUG_PRINT("---- rule id: %d ----", inner_id);
-    DEBUG_PRINT("rule mount_flags: 0x%x, neg_mount_flags: 0x%x", rule->mount_flags, rule->neg_mount_flags);
+    DEBUG_PRINT("rule mount_flags: 0x%x, reverse_mount_flags: 0x%x", rule->mount_flags, rule->reverse_mount_flags);
     DEBUG_PRINT("rule fstype: %s", rule->fstype);
     DEBUG_PRINT("rule prefix: %s, suffix: %s", rule->prefix, rule->suffix);
 
     // Permission check
-    if (flags & rule->mount_flags || (~flags) & rule->neg_mount_flags) {
+    if (flags & rule->mount_flags || (~flags) & rule->reverse_mount_flags) {
       if (mount_fstype_check(rule->fstype, &(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX])) && 
           mount_source_check(rule, buf, offset)) {
         DEBUG_PRINT("");
