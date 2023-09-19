@@ -11,6 +11,7 @@
 #include "process.h"
 #include "network.h"
 #include "ptrace.h"
+#include "mount.h"
 
 char __license[] SEC("license") = "GPL";
 
@@ -299,4 +300,38 @@ int BPF_PROG(varmor_ptrace_access_check, struct task_struct *child, unsigned int
   }
 
   return 0;
+}
+
+SEC("lsm/sb_mount")
+int BPF_PROG(varmor_mount, char *dev_name, struct path *path, char *type, unsigned long flags, void *data) {
+  // Retrieve the current task
+  struct task_struct *current = (struct task_struct *)bpf_get_current_task();
+
+  // Whether the current task has mount rules
+  u32 mnt_ns = get_task_mnt_ns_id(current);
+  u32 *vmount_inner = get_mount_inner_map(mnt_ns);
+  if (vmount_inner == NULL)
+    return 0;
+
+  // Prepare buffer
+  struct buffer_offset offset = { .first_path = 0, .first_name = 0, .second_path = 0, .second_name = 0 };
+  struct buffer *buf = get_buffer();
+  if (buf == NULL)
+    return 0;
+
+  // Extract the dev path from the dev_name parameter provided by LSM hook point
+  prepend_source_to_first_block(dev_name, buf, &offset);
+
+  // Extract the fstype from the type parameter provided by LSM hook point
+  prepend_fstype_to_third_block(type, buf);
+
+  DEBUG_PRINT("================ lsm/sb_mount ================");
+  DEBUG_PRINT("dev path: %s", buf->value);
+  DEBUG_PRINT("offset: %d, length: %d", offset.first_path, offset.first_path-1);
+  DEBUG_PRINT("dev name: %s, length: %d", &(buf->value[PATH_MAX*2]), offset.first_name);
+  DEBUG_PRINT("fstype: %s", &(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX]));
+  DEBUG_PRINT("flags: %d", flags);
+
+  // Iterate all rules in the inner map
+  return iterate_mount_inner_map(vmount_inner, flags, buf, &offset);
 }

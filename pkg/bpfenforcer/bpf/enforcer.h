@@ -44,9 +44,10 @@
   We use the buffer to cache file path(or old path), binary path(or new path) and file name etc.
   |---------------------------------------|---------------------------------------|---------------------------------------|
   |                                       |                                       |                                       |
-  |                              file path|                                       |file name            |offset-1|offset-2|
-  |                                 path-1|                                 path-2|name-1   |name-2   | |offset-1|offset-2|
+  |                              file path|                                       |file name                              |
+  |                                 path-1|                                 path-2|name-1   |name-2                       |
   |exec path                              |                            binary path|exec name|                             |
+  |dev path                               |                                       |dev name |                    |fstype  |
   |                                       |                                       |                                       |
   |---------------------------------------|---------------------------------------|---------------------------------------|
 

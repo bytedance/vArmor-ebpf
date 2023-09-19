@@ -396,3 +396,27 @@ func Test_VarmorPtraceAccessCheck(t *testing.T) {
 	// err = fmt.Errorf("forced error")
 	// assert.NilError(t, err)
 }
+
+func Test_VarmorMountAccessCheck(t *testing.T) {
+	log.SetLogger(klogr.New())
+	tracer := NewBpfEnforcer(log.Log.WithName("ebpf"))
+	err := tracer.InitEBPF()
+	assert.NilError(t, err)
+	defer tracer.RemoveEBPF()
+
+	err = tracer.StartEnforcing()
+	assert.NilError(t, err)
+	defer tracer.StopEnforcing()
+
+	rule, err := newBpfMountRule("/sys/fs/cgroup/devices", "*", 0, AA_MS_WRITE)
+	assert.NilError(t, err)
+
+	err = tracer.SetMountMap(4026532844, rule)
+	assert.NilError(t, err)
+
+	stopTicker := time.NewTicker(90 * time.Second)
+	<-stopTicker.C
+
+	// err = fmt.Errorf("forced error")
+	// assert.NilError(t, err)
+}

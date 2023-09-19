@@ -45,4 +45,43 @@
 #define PTRACE_MODE_READ	  0x01
 #define PTRACE_MODE_ATTACH	0x02
 
+// Generic flags of mount syscall
+// https://elixir.bootlin.com/linux/v5.19.17/source/include/uapi/linux/mount.h
+#define MS_RDONLY	            1	        /* Mount read-only */
+#define MS_NOSUID	            2	        /* Ignore suid and sgid bits */
+#define MS_NODEV	            4	        /* Disallow access to device special files */
+#define MS_NOEXEC	            8	        /* Disallow program execution */
+#define MS_SYNCHRONOUS	      16	      /* Writes are synced at once */
+#define MS_MANDLOCK	          64        /* Allow mandatory locks on an FS */
+#define MS_DIRSYNC	          128       /* Directory modifications are synchronous */
+#define MS_NOATIME	          1024	    /* Do not update access times. */
+#define MS_NODIRATIME	        2048	    /* Do not update directory access times */
+#define MS_SILENT	            32768
+#define MS_RELATIME	          (1<<21)	  /* Update atime relative to mtime/ctime. */
+#define MS_I_VERSION	        (1<<23)   /* Update inode I_version field */
+#define MS_STRICTATIME	      (1<<24)   /* Always perform atime updates */
+#define AA_MS_WRITE	          1	        /* Mount write or readwrite*/
+#define AA_MS_SUID	          2         /* Not ignore suid and sgid bits */
+#define AA_MS_DEV	            4	        /* Allow access to device special files */
+#define AA_MS_EXEC	          8	        /* Allow program execution */
+#define AA_MS_ASYNCHRONOUS    16        /* Writes are asynchronous */
+#define AA_MS_NOMANDLOCK	    64	      /* Disallow mandatory locks on an FS */
+#define AA_MS_ATIME           1024	    /* Update access times. */
+#define AA_MS_DIRATIME	      2048	    /* Update directory access times */
+#define AA_MS_LOUD            32768
+#define AA_MS_NORELATIME      (1<<21)	  /* Do not update atime relative to mtime/ctime. */
+#define AA_MS_NOI_VERSION     (1<<23)   /* Do not update inode I_version field */
+#define AA_MS_NO_STRICTATIME  (1<<24)   /* Disallow performing atime updates */
+
+// Command flags of mount syscall
+// https://elixir.bootlin.com/linux/v5.19.17/source/include/uapi/linux/mount.h
+#define MS_REMOUNT	    32	      /* Alter flags of a mounted FS */
+#define MS_BIND		      4096
+#define MS_MOVE		      8192
+#define MS_REC		      16384
+#define MS_UNBINDABLE	  (1<<17)	  /* change to unbindable */
+#define MS_PRIVATE	    (1<<18)	  /* change to private */
+#define MS_SLAVE	      (1<<19)	  /* change to slave */
+#define MS_SHARED	      (1<<20)	  /* change to shared */
+
 #endif /* __PERMS_H */

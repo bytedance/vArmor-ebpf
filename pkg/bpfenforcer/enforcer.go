@@ -33,26 +33,39 @@ import (
 )
 
 const (
-	BPF_F_INNER_MAP        = 0x1000
-	MAX_FILE_INNER_ENTRIES = 50
-	MAX_BPRM_INNER_ENTRIES = 50
-	MAX_NET_INNER_ENTRIES  = 50
-	PRECISE_MATCH          = 0x00000001
-	GREEDY_MATCH           = 0x00000002
-	PREFIX_MATCH           = 0x00000004
-	SUFFIX_MATCH           = 0x00000008
-	CIDR_MATCH             = 0x00000020
-	IPV4_MATCH             = 0x00000040
-	IPV6_MATCH             = 0x00000080
-	PORT_MATCH             = 0x00000100
-	AA_MAY_EXEC            = 0x00000001
-	AA_MAY_WRITE           = 0x00000002
-	AA_MAY_READ            = 0x00000004
-	AA_MAY_APPEND          = 0x00000008
-	AA_PTRACE_TRACE        = 0x00000002
-	AA_PTRACE_READ         = 0x00000004
-	AA_MAY_BE_TRACED       = 0x00000008
-	AA_MAY_BE_READ         = 0x00000010
+	BPF_F_INNER_MAP         = 0x1000
+	MAX_FILE_INNER_ENTRIES  = 50
+	MAX_BPRM_INNER_ENTRIES  = 50
+	MAX_NET_INNER_ENTRIES   = 50
+	MAX_MOUNT_INNER_ENTRIES = 50
+	PRECISE_MATCH           = 0x00000001
+	GREEDY_MATCH            = 0x00000002
+	PREFIX_MATCH            = 0x00000004
+	SUFFIX_MATCH            = 0x00000008
+	CIDR_MATCH              = 0x00000020
+	IPV4_MATCH              = 0x00000040
+	IPV6_MATCH              = 0x00000080
+	PORT_MATCH              = 0x00000100
+	AA_MAY_EXEC             = 0x00000001
+	AA_MAY_WRITE            = 0x00000002
+	AA_MAY_READ             = 0x00000004
+	AA_MAY_APPEND           = 0x00000008
+	AA_PTRACE_TRACE         = 0x00000002
+	AA_PTRACE_READ          = 0x00000004
+	AA_MAY_BE_TRACED        = 0x00000008
+	AA_MAY_BE_READ          = 0x00000010
+	AA_MS_WRITE             = 0x00000001
+	AA_MS_SUID              = 0x00000002
+	AA_MS_DEV               = 0x00000004
+	AA_MS_EXEC              = 0x00000008
+	AA_MS_ASYNCHRONOUS      = 0x00000010
+	AA_MS_NOMANDLOCK        = 0x00000040
+	AA_MS_ATIME             = 0x00000400
+	AA_MS_DIRATIME          = 0x00000800
+	AA_MS_LOUD              = 0x00008000
+	AA_MS_NORELATIME        = 0x00200000
+	AA_MS_NOI_VERSION       = 0x00800000
+	AA_MS_NO_STRICTATIME    = 0x01000000
 )
 
 type bpfPathRule struct {
@@ -69,6 +82,15 @@ type bpfNetworkRule struct {
 	Port    uint32
 }
 
+type bpfMountRule struct {
+	Flags         uint32
+	MountFlags    uint32
+	NegMountFlags uint32
+	FsType        [16]byte
+	Prefix        [64]byte
+	Suffix        [64]byte
+}
+
 type BpfEnforcer struct {
 	objs            bpfObjects
 	capableLink     link.Link
@@ -79,6 +101,7 @@ type BpfEnforcer struct {
 	bprmLink        link.Link
 	sockConnLink    link.Link
 	ptraceLink      link.Link
+	mountLink       link.Link
 	log             logr.Logger
 }
 
@@ -151,6 +174,15 @@ func (enforcer *BpfEnforcer) InitEBPF() error {
 		MaxEntries: MAX_NET_INNER_ENTRIES,
 	}
 	collectionSpec.Maps["v_net_outer"].InnerMap = &netInnerMap
+
+	mountInnerMap := ebpf.MapSpec{
+		Name:       "v_mount_inner_",
+		Type:       ebpf.Hash,
+		KeySize:    4,
+		ValueSize:  4*3 + 16 + 64*2,
+		MaxEntries: MAX_MOUNT_INNER_ENTRIES,
+	}
+	collectionSpec.Maps["v_mount_outer"].InnerMap = &mountInnerMap
 
 	initMntNsId, err := readMntNsID(1)
 	if err != nil {
@@ -248,6 +280,14 @@ func (enforcer *BpfEnforcer) StartEnforcing() error {
 	}
 	enforcer.ptraceLink = ptraceLink
 
+	mountLink, err := link.AttachLSM(link.LSMOptions{
+		Program: enforcer.objs.VarmorMount,
+	})
+	if err != nil {
+		return err
+	}
+	enforcer.mountLink = mountLink
+
 	enforcer.log.Info("start enforcing")
 
 	return nil
@@ -286,6 +326,10 @@ func (enforcer *BpfEnforcer) StopEnforcing() {
 
 	if enforcer.ptraceLink != nil {
 		enforcer.ptraceLink.Close()
+	}
+
+	if enforcer.mountLink != nil {
+		enforcer.mountLink.Close()
 	}
 }
 
@@ -542,4 +586,104 @@ func (enforcer *BpfEnforcer) SetPtraceMap(mntNsID uint32, ptraceRule uint64) err
 
 func (enforcer *BpfEnforcer) ClearPtraceMap(mntNsID uint32) error {
 	return enforcer.objs.V_ptrace.Delete(&mntNsID)
+}
+
+func newBpfMountRule(sourcePattern string, fstype string, mountFlags uint32, negMountflags uint32) (*bpfMountRule, error) {
+	// Pre-check
+	re, err := regexp2.Compile(`(?<!\*)\*(?!\*)`, regexp2.None)
+	if err != nil {
+		return nil, err
+	}
+	starWildcardLen := len(regexp2FindAllString(re, sourcePattern))
+
+	if starWildcardLen > 0 && strings.Contains(sourcePattern, "**") {
+		return nil, fmt.Errorf("the globbing * and ** in the pattern cannot be used at the same time")
+	}
+
+	if starWildcardLen > 1 || strings.Count(sourcePattern, "**") > 1 {
+		return nil, fmt.Errorf("the globbing * or ** in the pattern can only be used once")
+	}
+
+	var mountRule bpfMountRule
+	var flags uint32
+
+	if starWildcardLen > 0 {
+		if strings.Contains(sourcePattern, "/") {
+			return nil, fmt.Errorf("the pattern with globbing * is not supported")
+		}
+		stringList := strings.Split(sourcePattern, "*")
+
+		var prefix, suffix [64]byte
+		if len(stringList[0]) > 0 {
+			copy(prefix[:], stringList[0])
+			mountRule.Prefix = prefix
+			flags |= PREFIX_MATCH
+		}
+
+		if len(stringList[1]) > 0 {
+			copy(suffix[:], reverseString(stringList[1]))
+			mountRule.Suffix = suffix
+			flags |= SUFFIX_MATCH
+		}
+	} else if strings.Contains(sourcePattern, "**") {
+		flags |= GREEDY_MATCH
+
+		stringList := strings.Split(sourcePattern, "**")
+
+		var prefix, suffix [64]byte
+		if len(stringList[0]) > 0 {
+			copy(prefix[:], stringList[0])
+			mountRule.Prefix = prefix
+			flags |= PREFIX_MATCH
+		}
+
+		if len(stringList[1]) > 0 {
+			copy(suffix[:], reverseString(stringList[1]))
+			mountRule.Suffix = suffix
+			flags |= SUFFIX_MATCH
+		}
+	} else {
+		var prefix [64]byte
+		copy(prefix[:], sourcePattern)
+		mountRule.Prefix = prefix
+		flags |= PRECISE_MATCH | PREFIX_MATCH
+	}
+
+	mountRule.Flags = flags
+	mountRule.MountFlags = mountFlags
+	mountRule.NegMountFlags = negMountflags
+
+	var s [16]byte
+	copy(s[:], fstype)
+	mountRule.FsType = s
+
+	return &mountRule, nil
+}
+
+func (enforcer *BpfEnforcer) SetMountMap(mntNsID uint32, mountRule *bpfMountRule) error {
+	map_name := fmt.Sprintf("v_mount_inner_%d", mntNsID)
+	innerMapSpec := ebpf.MapSpec{
+		Name:       map_name,
+		Type:       ebpf.Hash,
+		KeySize:    4,
+		ValueSize:  4*3 + 16 + 64*2,
+		MaxEntries: MAX_MOUNT_INNER_ENTRIES,
+	}
+	innerMap, err := ebpf.NewMap(&innerMapSpec)
+	if err != nil {
+		return err
+	}
+	defer innerMap.Close()
+
+	var index uint32 = 0
+	err = innerMap.Put(&index, mountRule)
+	if err != nil {
+		return err
+	}
+
+	return enforcer.objs.V_mountOuter.Put(&mntNsID, innerMap)
+}
+
+func (enforcer *BpfEnforcer) ClearMountMap(mntNsID uint32) error {
+	return enforcer.objs.V_mountOuter.Delete(&mntNsID)
 }
