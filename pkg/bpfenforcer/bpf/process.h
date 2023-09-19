@@ -52,14 +52,14 @@ static __noinline int prepend_bprm_path_to_first_block(const char *filename, str
   return 0;
 }
 
-static __noinline bool bprm_permission_check(struct path_rule *rule, struct buffer *buf, struct buffer_offset *offset) {
+static __noinline bool bprm_path_check(struct path_rule *rule, struct buffer *buf, struct buffer_offset *offset) {
   bool match = true;
   if (rule->flags & GREEDY_MATCH || rule->flags & PRECISE_MATCH) {
     // precise match or greedy match for the globbing "**" with file path
-    DEBUG_PRINT("path match");
+    DEBUG_PRINT("bprm_path_check() - path match");
 
     if (rule->flags & PREFIX_MATCH) {
-      DEBUG_PRINT("rule prefix: %s", rule->prefix);
+      DEBUG_PRINT("bprm_path_check() - rule prefix: %s", rule->prefix);
       if (is_prefix_match(rule->prefix, buf->value)) {
         match = true;
       } else {
@@ -68,7 +68,7 @@ static __noinline bool bprm_permission_check(struct path_rule *rule, struct buff
     }
 
     if ((rule->flags & SUFFIX_MATCH) && match) {
-      DEBUG_PRINT("rule suffix: %s", rule->suffix);
+      DEBUG_PRINT("bprm_path_check() - rule suffix: %s", rule->suffix);
       if (is_suffix_match(rule->suffix, buf->value, offset->first_path - 2)) {
         match = true;
       } else {
@@ -77,10 +77,10 @@ static __noinline bool bprm_permission_check(struct path_rule *rule, struct buff
     }
   } else {
     // non-greedy match for the globbing "*" with file name
-    DEBUG_PRINT("name match");
+    DEBUG_PRINT("bprm_path_check() - name match");
 
     if (rule->flags & PREFIX_MATCH) {
-      DEBUG_PRINT("rule prefix: %s", rule->prefix);
+      DEBUG_PRINT("bprm_path_check() - rule prefix: %s", rule->prefix);
       if (is_prefix_match(rule->prefix, &(buf->value[PATH_MAX * 2]))) {
         match = true;
       } else {
@@ -89,7 +89,7 @@ static __noinline bool bprm_permission_check(struct path_rule *rule, struct buff
     }
 
     if ((rule->flags & SUFFIX_MATCH) && match) {
-      DEBUG_PRINT("rule suffix: %s", rule->suffix);
+      DEBUG_PRINT("bprm_path_check() - rule suffix: %s", rule->suffix);
       if (is_suffix_match(rule->suffix, buf->value + PATH_MAX*2, offset->first_name - 1)) {
         match = true;
       } else {
@@ -115,7 +115,7 @@ static __noinline int iterate_bprm_inner_map_for_executable(u32 *vbprm_inner, st
     DEBUG_PRINT("rule permissions: 0x%x, flags: 0x%x", rule->permissions, rule->flags);
 
     // Permission check
-    if (bprm_permission_check(rule, buf, offset)) {
+    if (bprm_path_check(rule, buf, offset)) {
       DEBUG_PRINT("");
       DEBUG_PRINT("access denied");
       return -EPERM;

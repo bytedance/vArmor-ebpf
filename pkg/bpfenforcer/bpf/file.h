@@ -251,21 +251,21 @@ static __noinline bool is_suffix_match(unsigned char *suffix, unsigned char *pat
 }
 
 /*
- * file_permission_check - do the file permission check against the rule
+ * file_path_check - do the file permission check against the rule
  * @rule: the deny rule which describes the match pattern and deny permissions
  * @buf:  the buffer that cache the file path, binary path and others
  * @offset: a buffer_offset structure with the offsets of file path, exe path, and file name.
  * 
  * Returns: true if access denied
 */
-static __always_inline bool file_permission_check(struct path_rule *rule, struct buffer *buf, struct buffer_offset *offset) {
+static __always_inline bool file_path_check(struct path_rule *rule, struct buffer *buf, struct buffer_offset *offset) {
   bool match = true;
   if (rule->flags & GREEDY_MATCH || rule->flags & PRECISE_MATCH) {
     // precise match or greedy match for the globbing "**" with file path
-    DEBUG_PRINT("path match");
+    DEBUG_PRINT("file_path_check() - path match");
 
     if (rule->flags & PREFIX_MATCH) {
-      DEBUG_PRINT("rule prefix: %s", rule->prefix);
+      DEBUG_PRINT("file_path_check() - rule prefix: %s", rule->prefix);
       if (is_prefix_match(rule->prefix, &(buf->value[offset->first_path & (PATH_MAX - 1)]))) {
         match = true;
       } else {
@@ -274,7 +274,7 @@ static __always_inline bool file_permission_check(struct path_rule *rule, struct
     }
 
     if ((rule->flags & SUFFIX_MATCH) && match) {
-      DEBUG_PRINT("rule suffix: %s", rule->suffix);
+      DEBUG_PRINT("file_path_check() - rule suffix: %s", rule->suffix);
       if (is_suffix_match(rule->suffix, buf->value, PATH_MAX - 2)) {
         match = true;
       } else {
@@ -283,10 +283,10 @@ static __always_inline bool file_permission_check(struct path_rule *rule, struct
     }
   } else {
     // non-greedy match for the globbing "*" with file name
-    DEBUG_PRINT("name match");
+    DEBUG_PRINT("file_path_check() - name match");
 
     if (rule->flags & PREFIX_MATCH) {
-      DEBUG_PRINT("rule prefix: %s", rule->prefix);
+      DEBUG_PRINT("file_path_check() - rule prefix: %s", rule->prefix);
       if (is_prefix_match(rule->prefix, &(buf->value[PATH_MAX * 2]))) {
         match = true;
       } else {
@@ -295,7 +295,7 @@ static __always_inline bool file_permission_check(struct path_rule *rule, struct
     }
 
     if ((rule->flags & SUFFIX_MATCH) && match) {
-      DEBUG_PRINT("rule suffix: %s", rule->suffix);
+      DEBUG_PRINT("file_path_check() - rule suffix: %s", rule->suffix);
       if (is_suffix_match(rule->suffix, buf->value + PATH_MAX*2, offset->first_name - 1)) {
         match = true;
       } else {
@@ -322,7 +322,7 @@ static __always_inline int iterate_file_inner_map_for_file(u32 *vfile_inner, str
 
     // Permission check
     if (rule->permissions & requested_perms) {
-      if (file_permission_check(rule, buf, offset)) {
+      if (file_path_check(rule, buf, offset)) {
         DEBUG_PRINT("");
         DEBUG_PRINT("access denied");
         return -EPERM;
@@ -335,14 +335,14 @@ static __always_inline int iterate_file_inner_map_for_file(u32 *vfile_inner, str
   return 0;
 }
 
-static __noinline bool old_path_permission_check(struct path_rule *rule, struct buffer *buf, struct buffer_offset *offset) {
+static __noinline bool old_path_check(struct path_rule *rule, struct buffer *buf, struct buffer_offset *offset) {
   bool match = true;
   if (rule->flags & GREEDY_MATCH || rule->flags & PRECISE_MATCH) {
     // precise match or greedy match for the globbing "**" with file path
-    DEBUG_PRINT("file path match");
+    DEBUG_PRINT("old_path_check() - file path match");
 
     if (rule->flags & PREFIX_MATCH) {
-      DEBUG_PRINT("rule prefix: %s", rule->prefix);
+      DEBUG_PRINT("old_path_check() - rule prefix: %s", rule->prefix);
       if (is_prefix_match(rule->prefix, &(buf->value[offset->first_path & (PATH_MAX - 1)]))) {
         match = true;
       } else {
@@ -351,7 +351,7 @@ static __noinline bool old_path_permission_check(struct path_rule *rule, struct 
     }
 
     if ((rule->flags & SUFFIX_MATCH) && match) {
-      DEBUG_PRINT("rule suffix: %s", rule->suffix);
+      DEBUG_PRINT("old_path_check() - rule suffix: %s", rule->suffix);
       if (is_suffix_match(rule->suffix, buf->value, PATH_MAX - 2)) {
         match = true;
       } else {
@@ -360,10 +360,10 @@ static __noinline bool old_path_permission_check(struct path_rule *rule, struct 
     }
   } else {
     // non-greedy match for the globbing "*" with file name
-    DEBUG_PRINT("file name match");
+    DEBUG_PRINT("old_path_check() - file name match");
 
     if (rule->flags & PREFIX_MATCH) {
-      DEBUG_PRINT("rule prefix: %s", rule->prefix);
+      DEBUG_PRINT("old_path_check() - rule prefix: %s", rule->prefix);
       if (is_prefix_match(rule->prefix, &(buf->value[PATH_MAX * 2]))) {
         match = true;
       } else {
@@ -372,7 +372,7 @@ static __noinline bool old_path_permission_check(struct path_rule *rule, struct 
     }
 
     if ((rule->flags & SUFFIX_MATCH) && match) {
-      DEBUG_PRINT("rule suffix: %s", rule->suffix);
+      DEBUG_PRINT("old_path_check() - rule suffix: %s", rule->suffix);
       if (is_suffix_match(rule->suffix, buf->value + PATH_MAX*2, offset->first_name - 1)) {
         match = true;
       } else {
@@ -384,14 +384,14 @@ static __noinline bool old_path_permission_check(struct path_rule *rule, struct 
   return match;
 }
 
-static __noinline bool new_path_permission_check(struct path_rule *rule, struct buffer *buf, struct buffer_offset *offset) {
+static __noinline bool new_path_check(struct path_rule *rule, struct buffer *buf, struct buffer_offset *offset) {
   bool match = true;
   if (rule->flags & GREEDY_MATCH || rule->flags & PRECISE_MATCH) {
     // precise match or greedy match for the globbing "**" with file path
-    DEBUG_PRINT("file path match");
+    DEBUG_PRINT("new_path_check() - file path match");
 
     if (rule->flags & PREFIX_MATCH) {
-      DEBUG_PRINT("rule prefix: %s", rule->prefix);
+      DEBUG_PRINT("new_path_check() - rule prefix: %s", rule->prefix);
       if (is_prefix_match(rule->prefix, &(buf->value[offset->second_path & (PATH_MAX*2 - 1)]))) {
         match = true;
       } else {
@@ -400,7 +400,7 @@ static __noinline bool new_path_permission_check(struct path_rule *rule, struct 
     }
 
     if ((rule->flags & SUFFIX_MATCH) && match) {
-      DEBUG_PRINT("rule suffix: %s", rule->suffix);
+      DEBUG_PRINT("new_path_check() - rule suffix: %s", rule->suffix);
       if (is_suffix_match(rule->suffix, buf->value + PATH_MAX, PATH_MAX*2 - 2)) {
         match = true;
       } else {
@@ -409,10 +409,10 @@ static __noinline bool new_path_permission_check(struct path_rule *rule, struct 
     }
   } else {
     // non-greedy match for the globbing "*" with file name
-    DEBUG_PRINT("file name match");
+    DEBUG_PRINT("new_path_check() - file name match");
 
     if (rule->flags & PREFIX_MATCH) {
-      DEBUG_PRINT("rule prefix: %s", rule->prefix);
+      DEBUG_PRINT("new_path_check() - rule prefix: %s", rule->prefix);
       if (is_prefix_match(rule->prefix, &(buf->value[PATH_MAX*2 + NAME_MAX]))) {
         match = true;
       } else {
@@ -421,7 +421,7 @@ static __noinline bool new_path_permission_check(struct path_rule *rule, struct 
     }
 
     if ((rule->flags & SUFFIX_MATCH) && match) {
-      DEBUG_PRINT("rule suffix: %s", rule->suffix);
+      DEBUG_PRINT("new_path_check() - rule suffix: %s", rule->suffix);
       if (is_suffix_match(rule->suffix, buf->value + PATH_MAX*2, NAME_MAX + offset->second_name - 1)) {
         match = true;
       } else {
@@ -448,7 +448,7 @@ static __noinline int iterate_file_inner_map_for_path_pair(u32 *vfile_inner, str
 
     // Permission check
     if (rule->permissions & AA_MAY_READ) {
-      if (old_path_permission_check(rule, buf, offset)) {
+      if (old_path_check(rule, buf, offset)) {
         DEBUG_PRINT("");
         DEBUG_PRINT("access denied");
         return -EPERM;
@@ -456,7 +456,7 @@ static __noinline int iterate_file_inner_map_for_path_pair(u32 *vfile_inner, str
     }
 
     if (rule->permissions & AA_MAY_WRITE) {
-      if (new_path_permission_check(rule, buf, offset)) {
+      if (new_path_check(rule, buf, offset)) {
         DEBUG_PRINT("");
         DEBUG_PRINT("access denied");
         return -EPERM;
