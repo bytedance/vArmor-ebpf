@@ -33,27 +33,29 @@ import (
 )
 
 const (
-	BPF_F_INNER_MAP         = 0x1000
-	MAX_FILE_INNER_ENTRIES  = 50
-	MAX_BPRM_INNER_ENTRIES  = 50
-	MAX_NET_INNER_ENTRIES   = 50
-	MAX_MOUNT_INNER_ENTRIES = 50
-	PRECISE_MATCH           = 0x00000001
-	GREEDY_MATCH            = 0x00000002
-	PREFIX_MATCH            = 0x00000004
-	SUFFIX_MATCH            = 0x00000008
-	CIDR_MATCH              = 0x00000020
-	IPV4_MATCH              = 0x00000040
-	IPV6_MATCH              = 0x00000080
-	PORT_MATCH              = 0x00000100
-	AA_MAY_EXEC             = 0x00000001
-	AA_MAY_WRITE            = 0x00000002
-	AA_MAY_READ             = 0x00000004
-	AA_MAY_APPEND           = 0x00000008
-	AA_PTRACE_TRACE         = 0x00000002
-	AA_PTRACE_READ          = 0x00000004
-	AA_MAY_BE_TRACED        = 0x00000008
-	AA_MAY_BE_READ          = 0x00000010
+	BPF_F_INNER_MAP            = 0x1000
+	MAX_FILE_INNER_ENTRIES     = 50
+	MAX_BPRM_INNER_ENTRIES     = 50
+	MAX_NET_INNER_ENTRIES      = 50
+	MAX_MOUNT_INNER_ENTRIES    = 50
+	FILE_PATH_PATTERN_SIZE_MAX = 64
+	FILE_SYSTEM_TYPE_MAX       = 16
+	PRECISE_MATCH              = 0x00000001
+	GREEDY_MATCH               = 0x00000002
+	PREFIX_MATCH               = 0x00000004
+	SUFFIX_MATCH               = 0x00000008
+	CIDR_MATCH                 = 0x00000020
+	IPV4_MATCH                 = 0x00000040
+	IPV6_MATCH                 = 0x00000080
+	PORT_MATCH                 = 0x00000100
+	AA_MAY_EXEC                = 0x00000001
+	AA_MAY_WRITE               = 0x00000002
+	AA_MAY_READ                = 0x00000004
+	AA_MAY_APPEND              = 0x00000008
+	AA_PTRACE_TRACE            = 0x00000002
+	AA_PTRACE_READ             = 0x00000004
+	AA_MAY_BE_TRACED           = 0x00000008
+	AA_MAY_BE_READ             = 0x00000010
 )
 
 type bpfPathRule struct {
@@ -352,6 +354,10 @@ func regexp2FindAllString(re *regexp2.Regexp, s string) []string {
 
 func newBpfPathRule(pattern string, permissions uint32) (*bpfPathRule, error) {
 	// Pre-check
+	if len(pattern) >= FILE_PATH_PATTERN_SIZE_MAX {
+		return nil, fmt.Errorf("the length of pattern '%s' should be less than the maximum (%d)", pattern, FILE_PATH_PATTERN_SIZE_MAX)
+	}
+
 	re, err := regexp2.Compile(`(?<!\*)\*(?!\*)`, regexp2.None)
 	if err != nil {
 		return nil, err
@@ -359,11 +365,11 @@ func newBpfPathRule(pattern string, permissions uint32) (*bpfPathRule, error) {
 	starWildcardLen := len(regexp2FindAllString(re, pattern))
 
 	if starWildcardLen > 0 && strings.Contains(pattern, "**") {
-		return nil, fmt.Errorf("the globbing * and ** in the pattern cannot be used at the same time")
+		return nil, fmt.Errorf("the globbing * and ** in the pattern '%s' cannot be used at the same time", pattern)
 	}
 
 	if starWildcardLen > 1 || strings.Count(pattern, "**") > 1 {
-		return nil, fmt.Errorf("the globbing * or ** in the pattern can only be used once")
+		return nil, fmt.Errorf("the globbing * or ** in the pattern '%s' can only be used once", pattern)
 	}
 
 	// Create bpfPathRule
@@ -372,7 +378,7 @@ func newBpfPathRule(pattern string, permissions uint32) (*bpfPathRule, error) {
 
 	if starWildcardLen > 0 {
 		if strings.Contains(pattern, "/") {
-			return nil, fmt.Errorf("the pattern with globbing * is not supported")
+			return nil, fmt.Errorf("the pattern '%s' with globbing * is not supported", pattern)
 		}
 		stringList := strings.Split(pattern, "*")
 
@@ -578,6 +584,14 @@ func (enforcer *BpfEnforcer) ClearPtraceMap(mntNsID uint32) error {
 
 func newBpfMountRule(sourcePattern string, fstype string, mountFlags uint32, reverseMountFlags uint32) (*bpfMountRule, error) {
 	// Pre-check
+	if len(sourcePattern) >= FILE_PATH_PATTERN_SIZE_MAX {
+		return nil, fmt.Errorf("the length of pattern '%s' should be less than the maximum (%d)", sourcePattern, FILE_PATH_PATTERN_SIZE_MAX)
+	}
+
+	if len(fstype) >= FILE_SYSTEM_TYPE_MAX {
+		return nil, fmt.Errorf("the length of fstype '%s' should be less than the maximum (%d)", fstype, FILE_SYSTEM_TYPE_MAX)
+	}
+
 	re, err := regexp2.Compile(`(?<!\*)\*(?!\*)`, regexp2.None)
 	if err != nil {
 		return nil, err
@@ -585,11 +599,11 @@ func newBpfMountRule(sourcePattern string, fstype string, mountFlags uint32, rev
 	starWildcardLen := len(regexp2FindAllString(re, sourcePattern))
 
 	if starWildcardLen > 0 && strings.Contains(sourcePattern, "**") {
-		return nil, fmt.Errorf("the globbing * and ** in the pattern cannot be used at the same time")
+		return nil, fmt.Errorf("the globbing * and ** in the pattern '%s' cannot be used at the same time", sourcePattern)
 	}
 
 	if starWildcardLen > 1 || strings.Count(sourcePattern, "**") > 1 {
-		return nil, fmt.Errorf("the globbing * or ** in the pattern can only be used once")
+		return nil, fmt.Errorf("the globbing * or ** in the pattern '%s' can only be used once", sourcePattern)
 	}
 
 	var mountRule bpfMountRule
@@ -597,7 +611,7 @@ func newBpfMountRule(sourcePattern string, fstype string, mountFlags uint32, rev
 
 	if starWildcardLen > 0 {
 		if strings.Contains(sourcePattern, "/") {
-			return nil, fmt.Errorf("the pattern with globbing * is not supported")
+			return nil, fmt.Errorf("the pattern '%s' with globbing * is not supported", sourcePattern)
 		}
 		stringList := strings.Split(sourcePattern, "*")
 

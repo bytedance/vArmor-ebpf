@@ -68,7 +68,7 @@ func Test_VarmorCapable(t *testing.T) {
 
 	fmt.Println("deny tasks(mnt ns id: 4026533394) to use CAP_NET_RAW | CAP_SYS_ADMIN")
 
-	stopTicker := time.NewTicker(25 * time.Second)
+	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
 
 	fmt.Println("allow tasks(mnt ns id: 4026533394) to use CAP_NET_RAW | CAP_SYS_ADMIN")
@@ -91,62 +91,67 @@ func Test_newBpfPathRule(t *testing.T) {
 		{
 			pattern:     "/**/devices/ta*",
 			permission:  AA_MAY_WRITE,
-			expectedErr: fmt.Errorf("the globbing * and ** in the pattern cannot be used at the same time"),
+			expectedErr: fmt.Errorf("the globbing * and ** in the pattern '/**/devices/ta*' cannot be used at the same time"),
 		},
 		{
 			pattern:     "/dwa**/devices/*",
 			permission:  AA_MAY_WRITE,
-			expectedErr: fmt.Errorf("the globbing * and ** in the pattern cannot be used at the same time"),
+			expectedErr: fmt.Errorf("the globbing * and ** in the pattern '/dwa**/devices/*' cannot be used at the same time"),
 		},
 		{
 			pattern:     "/**dwad/devices/*/dwa",
 			permission:  AA_MAY_WRITE,
-			expectedErr: fmt.Errorf("the globbing * and ** in the pattern cannot be used at the same time"),
+			expectedErr: fmt.Errorf("the globbing * and ** in the pattern '/**dwad/devices/*/dwa' cannot be used at the same time"),
 		},
 		{
 			pattern:     "/dwad/d**evices/*/",
 			permission:  AA_MAY_WRITE,
-			expectedErr: fmt.Errorf("the globbing * and ** in the pattern cannot be used at the same time"),
+			expectedErr: fmt.Errorf("the globbing * and ** in the pattern '/dwad/d**evices/*/' cannot be used at the same time"),
 		},
 		{
 			pattern:     "/dwad/*/**devices/ta*",
 			permission:  AA_MAY_WRITE,
-			expectedErr: fmt.Errorf("the globbing * and ** in the pattern cannot be used at the same time"),
+			expectedErr: fmt.Errorf("the globbing * and ** in the pattern '/dwad/*/**devices/ta*' cannot be used at the same time"),
 		},
 		{
 			pattern:     "/**/devices/**/tasks",
 			permission:  AA_MAY_WRITE,
-			expectedErr: fmt.Errorf("the globbing * or ** in the pattern can only be used once"),
+			expectedErr: fmt.Errorf("the globbing * or ** in the pattern '/**/devices/**/tasks' can only be used once"),
 		},
 		{
 			pattern:     "/devices**/**/tasks",
 			permission:  AA_MAY_WRITE,
-			expectedErr: fmt.Errorf("the globbing * or ** in the pattern can only be used once"),
+			expectedErr: fmt.Errorf("the globbing * or ** in the pattern '/devices**/**/tasks' can only be used once"),
 		},
 		{
 			pattern:     "/*/devices/tda*",
 			permission:  AA_MAY_WRITE,
-			expectedErr: fmt.Errorf("the globbing * or ** in the pattern can only be used once"),
+			expectedErr: fmt.Errorf("the globbing * or ** in the pattern '/*/devices/tda*' can only be used once"),
 		},
 		{
 			pattern:     "/*/*",
 			permission:  AA_MAY_WRITE,
-			expectedErr: fmt.Errorf("the globbing * or ** in the pattern can only be used once"),
+			expectedErr: fmt.Errorf("the globbing * or ** in the pattern '/*/*' can only be used once"),
 		},
 		{
 			pattern:     "/*devices/ta*",
 			permission:  AA_MAY_WRITE,
-			expectedErr: fmt.Errorf("the globbing * or ** in the pattern can only be used once"),
+			expectedErr: fmt.Errorf("the globbing * or ** in the pattern '/*devices/ta*' can only be used once"),
 		},
 		{
 			pattern:     "/devices/*ta",
 			permission:  AA_MAY_WRITE,
-			expectedErr: fmt.Errorf("the pattern with globbing * is not supported"),
+			expectedErr: fmt.Errorf("the pattern '/devices/*ta' with globbing * is not supported"),
 		},
 		{
 			pattern:     "/etc/*",
 			permission:  AA_MAY_WRITE,
-			expectedErr: fmt.Errorf("the pattern with globbing * is not supported"),
+			expectedErr: fmt.Errorf("the pattern '/etc/*' with globbing * is not supported"),
+		},
+		{
+			pattern:     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+			permission:  AA_MAY_WRITE,
+			expectedErr: fmt.Errorf("the length of pattern 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' should be less than the maximum (%d)", FILE_PATH_PATTERN_SIZE_MAX),
 		},
 		{
 			pattern:     "/**/devices/ta",
@@ -199,7 +204,7 @@ func Test_VarmorFileRule(t *testing.T) {
 	err = tracer.SetFileMap(4026531840, rule)
 	assert.NilError(t, err)
 
-	stopTicker := time.NewTicker(90 * time.Second)
+	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
 
 	// err = fmt.Errorf("forced error")
@@ -223,7 +228,7 @@ func Test_VarmorBprmCheckSecurity(t *testing.T) {
 	err = tracer.SetBprmMap(4026532844, rule)
 	assert.NilError(t, err)
 
-	stopTicker := time.NewTicker(90 * time.Second)
+	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
 
 	// err = fmt.Errorf("forced error")
@@ -369,7 +374,7 @@ func Test_VarmorNetCheckSecurity(t *testing.T) {
 	err = tracer.SetNetMap(4026533559, rule)
 	assert.NilError(t, err)
 
-	stopTicker := time.NewTicker(90 * time.Second)
+	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
 
 	// err = fmt.Errorf("forced error")
@@ -390,7 +395,7 @@ func Test_VarmorPtraceAccessCheck(t *testing.T) {
 	rule := newBpfPtraceRule(AA_MAY_BE_READ, GREEDY_MATCH)
 	tracer.SetPtraceMap(4026533400, rule)
 
-	stopTicker := time.NewTicker(90 * time.Second)
+	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
 
 	// err = fmt.Errorf("forced error")
@@ -414,7 +419,7 @@ func Test_VarmorMountAccessCheck(t *testing.T) {
 	err = tracer.SetMountMap(4026532844, rule)
 	assert.NilError(t, err)
 
-	stopTicker := time.NewTicker(90 * time.Second)
+	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
 
 	// err = fmt.Errorf("forced error")
