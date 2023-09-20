@@ -651,11 +651,11 @@ func newBpfMountRule(sourcePattern string, fstype string, mountFlags uint32, rev
 		flags |= PRECISE_MATCH | PREFIX_MATCH
 	}
 
-	if len(mountRule.Prefix) >= FILE_PATH_PATTERN_SIZE_MAX {
+	if mountRule.Prefix[FILE_PATH_PATTERN_SIZE_MAX-1] != 0 {
 		return nil, fmt.Errorf("the length of prefix '%s' should be less than the maximum (%d)", mountRule.Prefix, FILE_PATH_PATTERN_SIZE_MAX)
 	}
 
-	if len(mountRule.Suffix) >= FILE_PATH_PATTERN_SIZE_MAX {
+	if mountRule.Suffix[FILE_PATH_PATTERN_SIZE_MAX-1] != 0 {
 		return nil, fmt.Errorf("the length of suffix '%s' should be less than the maximum (%d)", mountRule.Suffix, FILE_PATH_PATTERN_SIZE_MAX)
 	}
 
