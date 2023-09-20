@@ -149,9 +149,14 @@ func Test_newBpfPathRule(t *testing.T) {
 			expectedErr: fmt.Errorf("the pattern '/etc/*' with globbing * is not supported"),
 		},
 		{
-			pattern:     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+			pattern:     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*xx",
 			permission:  AA_MAY_WRITE,
-			expectedErr: fmt.Errorf("the length of pattern 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' should be less than the maximum (%d)", FILE_PATH_PATTERN_SIZE_MAX),
+			expectedErr: fmt.Errorf("the length of prefix 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' should be less than the maximum (%d)", FILE_PATH_PATTERN_SIZE_MAX),
+		},
+		{
+			pattern:     "x*xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+			permission:  AA_MAY_WRITE,
+			expectedErr: fmt.Errorf("the length of suffix 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' should be less than the maximum (%d)", FILE_PATH_PATTERN_SIZE_MAX),
 		},
 		{
 			pattern:     "/**/devices/ta",

@@ -354,10 +354,6 @@ func regexp2FindAllString(re *regexp2.Regexp, s string) []string {
 
 func newBpfPathRule(pattern string, permissions uint32) (*bpfPathRule, error) {
 	// Pre-check
-	if len(pattern) >= FILE_PATH_PATTERN_SIZE_MAX {
-		return nil, fmt.Errorf("the length of pattern '%s' should be less than the maximum (%d)", pattern, FILE_PATH_PATTERN_SIZE_MAX)
-	}
-
 	re, err := regexp2.Compile(`(?<!\*)\*(?!\*)`, regexp2.None)
 	if err != nil {
 		return nil, err
@@ -416,6 +412,14 @@ func newBpfPathRule(pattern string, permissions uint32) (*bpfPathRule, error) {
 		copy(prefix[:], pattern)
 		pathRule.Prefix = prefix
 		flags |= PRECISE_MATCH | PREFIX_MATCH
+	}
+
+	if pathRule.Prefix[FILE_PATH_PATTERN_SIZE_MAX-1] != 0 {
+		return nil, fmt.Errorf("the length of prefix '%s' should be less than the maximum (%d)", pathRule.Prefix, FILE_PATH_PATTERN_SIZE_MAX)
+	}
+
+	if pathRule.Suffix[FILE_PATH_PATTERN_SIZE_MAX-1] != 0 {
+		return nil, fmt.Errorf("the length of suffix '%s' should be less than the maximum (%d)", pathRule.Suffix, FILE_PATH_PATTERN_SIZE_MAX)
 	}
 
 	pathRule.Flags = flags
@@ -584,10 +588,6 @@ func (enforcer *BpfEnforcer) ClearPtraceMap(mntNsID uint32) error {
 
 func newBpfMountRule(sourcePattern string, fstype string, mountFlags uint32, reverseMountFlags uint32) (*bpfMountRule, error) {
 	// Pre-check
-	if len(sourcePattern) >= FILE_PATH_PATTERN_SIZE_MAX {
-		return nil, fmt.Errorf("the length of pattern '%s' should be less than the maximum (%d)", sourcePattern, FILE_PATH_PATTERN_SIZE_MAX)
-	}
-
 	if len(fstype) >= FILE_SYSTEM_TYPE_MAX {
 		return nil, fmt.Errorf("the length of fstype '%s' should be less than the maximum (%d)", fstype, FILE_SYSTEM_TYPE_MAX)
 	}
@@ -649,6 +649,14 @@ func newBpfMountRule(sourcePattern string, fstype string, mountFlags uint32, rev
 		copy(prefix[:], sourcePattern)
 		mountRule.Prefix = prefix
 		flags |= PRECISE_MATCH | PREFIX_MATCH
+	}
+
+	if len(mountRule.Prefix) >= FILE_PATH_PATTERN_SIZE_MAX {
+		return nil, fmt.Errorf("the length of prefix '%s' should be less than the maximum (%d)", mountRule.Prefix, FILE_PATH_PATTERN_SIZE_MAX)
+	}
+
+	if len(mountRule.Suffix) >= FILE_PATH_PATTERN_SIZE_MAX {
+		return nil, fmt.Errorf("the length of suffix '%s' should be less than the maximum (%d)", mountRule.Suffix, FILE_PATH_PATTERN_SIZE_MAX)
 	}
 
 	mountRule.Flags = flags
