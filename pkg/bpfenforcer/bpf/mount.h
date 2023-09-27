@@ -108,7 +108,8 @@ static __noinline int iterate_move_mount_inner_map(u32 *vmount_inner, unsigned l
 
     // Permission check
     if (flags & rule->mount_flags || (~flags) & rule->reverse_mount_flags) {
-      if (old_path_check(&rule->pattern, buf, offset)) {
+      if (mount_fstype_check(rule->fstype, &(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX])) && 
+          old_path_check(&rule->pattern, buf, offset)) {
         DEBUG_PRINT("");
         DEBUG_PRINT("access denied");
         return -EPERM;

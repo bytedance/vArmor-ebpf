@@ -358,11 +358,16 @@ int BPF_PROG(varmor_move_mount, struct path *from_path, struct path *to_path) {
 
   // Mock flags
   unsigned long flags = MS_MOVE;
+  buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX] = 'n';
+  buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+1] = 'o';
+  buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+2] = 'n';
+  buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+3] = 'e';
 
   DEBUG_PRINT("================ lsm/move_mount ================");
   DEBUG_PRINT("from path: %s, length: %d, from path offset: %d", 
       &(buf->value[offset.first_path & (PATH_MAX-1)]), PATH_MAX-offset.first_path-1, offset.first_path);
   DEBUG_PRINT("from name: %s, length: %d", &(buf->value[PATH_MAX*2]), offset.first_name);
+  DEBUG_PRINT("fstype: %s", &(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX]));
   DEBUG_PRINT("flags: %d", flags);
 
   // Iterate all rules in the inner map
