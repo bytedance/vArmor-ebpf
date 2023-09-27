@@ -73,10 +73,10 @@ type bpfNetworkRule struct {
 }
 
 type bpfMountRule struct {
-	Flags             uint32
 	MountFlags        uint32
 	ReverseMountFlags uint32
 	FsType            [16]byte
+	Flags             uint32
 	Prefix            [64]byte
 	Suffix            [64]byte
 }
@@ -92,6 +92,7 @@ type BpfEnforcer struct {
 	sockConnLink    link.Link
 	ptraceLink      link.Link
 	mountLink       link.Link
+	moveMountLink   link.Link
 	log             logr.Logger
 }
 
@@ -278,6 +279,14 @@ func (enforcer *BpfEnforcer) StartEnforcing() error {
 	}
 	enforcer.mountLink = mountLink
 
+	moveMountLink, err := link.AttachLSM(link.LSMOptions{
+		Program: enforcer.objs.VarmorMoveMount,
+	})
+	if err != nil {
+		return err
+	}
+	enforcer.moveMountLink = moveMountLink
+
 	enforcer.log.Info("start enforcing")
 
 	return nil
@@ -285,42 +294,16 @@ func (enforcer *BpfEnforcer) StartEnforcing() error {
 
 func (enforcer *BpfEnforcer) StopEnforcing() {
 	enforcer.log.Info("stop enforcing")
-
-	if enforcer.capableLink != nil {
-		enforcer.capableLink.Close()
-	}
-
-	if enforcer.openFileLink != nil {
-		enforcer.openFileLink.Close()
-	}
-
-	if enforcer.pathSymlinkLink != nil {
-		enforcer.pathSymlinkLink.Close()
-	}
-
-	if enforcer.pathLinkLink != nil {
-		enforcer.pathLinkLink.Close()
-	}
-
-	if enforcer.pathRenameLink != nil {
-		enforcer.pathRenameLink.Close()
-	}
-
-	if enforcer.bprmLink != nil {
-		enforcer.bprmLink.Close()
-	}
-
-	if enforcer.sockConnLink != nil {
-		enforcer.sockConnLink.Close()
-	}
-
-	if enforcer.ptraceLink != nil {
-		enforcer.ptraceLink.Close()
-	}
-
-	if enforcer.mountLink != nil {
-		enforcer.mountLink.Close()
-	}
+	enforcer.capableLink.Close()
+	enforcer.openFileLink.Close()
+	enforcer.pathSymlinkLink.Close()
+	enforcer.pathLinkLink.Close()
+	enforcer.pathRenameLink.Close()
+	enforcer.bprmLink.Close()
+	enforcer.sockConnLink.Close()
+	enforcer.ptraceLink.Close()
+	enforcer.mountLink.Close()
+	enforcer.moveMountLink.Close()
 }
 
 func (enforcer *BpfEnforcer) SetCapableMap(mntNsID uint32, capability uint64) error {

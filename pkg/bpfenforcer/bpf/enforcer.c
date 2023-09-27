@@ -240,7 +240,7 @@ int BPF_PROG(varmor_bprm_check_security, struct linux_binprm *bprm, int ret) {
     return 0;
 
   // Extract the new executable path from the bprm structure provided by LSM Hook
-  prepend_bprm_path_to_first_block(bprm->filename, buf, &offset);
+  prepend_string_to_first_block(bprm->filename, buf, &offset);
 
   DEBUG_PRINT("================ lsm/bprm_check_security ================");
   DEBUG_PRINT("path: %s", buf->value);
@@ -320,7 +320,7 @@ int BPF_PROG(varmor_mount, char *dev_name, struct path *path, char *type, unsign
     return 0;
 
   // Extract the dev path from the dev_name parameter provided by LSM hook point
-  prepend_source_to_first_block(dev_name, buf, &offset);
+  prepend_string_to_first_block(dev_name, buf, &offset);
 
   // Extract the fstype from the type parameter provided by LSM hook point
   prepend_fstype_to_third_block(type, buf);
@@ -334,4 +334,37 @@ int BPF_PROG(varmor_mount, char *dev_name, struct path *path, char *type, unsign
 
   // Iterate all rules in the inner map
   return iterate_mount_inner_map(vmount_inner, flags, buf, &offset);
+}
+
+SEC("lsm/move_mount")
+int BPF_PROG(varmor_move_mount, struct path *from_path, struct path *to_path) {
+  // Retrieve the current task
+  struct task_struct *current = (struct task_struct *)bpf_get_current_task();
+
+  // Whether the current task has mount rules
+  u32 mnt_ns = get_task_mnt_ns_id(current);
+  u32 *vmount_inner = get_mount_inner_map(mnt_ns);
+  if (vmount_inner == NULL)
+    return 0;
+
+  // Prepare buffer
+  struct buffer_offset offset = { .first_path = 0, .first_name = 0, .second_path = 0, .second_name = 0 };
+  struct buffer *buf = get_buffer();
+  if (buf == NULL)
+    return 0;
+  
+  // Extract the source path from the from_path parameter provided by LSM hook point
+  prepend_path_to_first_block(from_path->dentry, from_path->mnt, buf, &offset);
+
+  // Mock flags
+  unsigned long flags = MS_MOVE;
+
+  DEBUG_PRINT("================ lsm/move_mount ================");
+  DEBUG_PRINT("from path: %s, length: %d, from path offset: %d", 
+      &(buf->value[offset.first_path & (PATH_MAX-1)]), PATH_MAX-offset.first_path-1, offset.first_path);
+  DEBUG_PRINT("from name: %s, length: %d", &(buf->value[PATH_MAX*2]), offset.first_name);
+  DEBUG_PRINT("flags: %d", flags);
+
+  // Iterate all rules in the inner map
+  return iterate_move_mount_inner_map(vmount_inner, flags, buf, &offset);
 }
