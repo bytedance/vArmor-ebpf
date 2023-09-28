@@ -356,7 +356,11 @@ int BPF_PROG(varmor_move_mount, struct path *from_path, struct path *to_path) {
   // Extract the source path from the from_path parameter provided by LSM hook point
   prepend_path_to_first_block(from_path->dentry, from_path->mnt, buf, &offset);
 
-  // Mock flags
+  // Mock flags and fstype
+  // move_mount() is a part of the new system calls for mounting file systems 
+  // since v5.2. See https://lwn.net/Articles/759499/ 
+  // We only care about the relocation use case of move_mount() for now, and
+  // reuse the rules for mount().
   unsigned long flags = MS_MOVE;
   buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX] = 'n';
   buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+1] = 'o';
