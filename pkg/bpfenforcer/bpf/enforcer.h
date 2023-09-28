@@ -121,9 +121,9 @@ static inline struct mount *real_mount(struct vfsmount *mnt) {
 // prepend_path_to_first_block - parse the file path to the first block but ignores chroot'ed root.
 static __noinline int prepend_path_to_first_block(struct dentry *dentry, struct vfsmount *vfsmnt, struct buffer *buf, struct buffer_offset *buf_offset) {
   struct mount *mnt = real_mount(vfsmnt);
-  struct dentry *parent;
+  struct mount *mnt_parent;
+  struct dentry *dentry_parent;
   struct dentry *mnt_root;
-  struct mount *m;
   struct qstr d_name;
 
   char slash = '/';
@@ -132,20 +132,17 @@ static __noinline int prepend_path_to_first_block(struct dentry *dentry, struct 
 
   #pragma unroll
   for (int i = 0; i < PATH_DEPTH_MAX; i++) {
-    parent = BPF_CORE_READ(dentry, d_parent);
-    mnt_root = BPF_CORE_READ(vfsmnt, mnt_root);
-
-    if (dentry == mnt_root) {
-      m = BPF_CORE_READ(mnt, mnt_parent);
-      if (mnt != m) {
+    mnt_root = BPF_CORE_READ(mnt, mnt).mnt_root;
+    if (mnt_root == dentry) {
+      mnt_parent = BPF_CORE_READ(mnt, mnt_parent);
+      if (mnt_parent != mnt) {
         dentry = BPF_CORE_READ(mnt, mnt_mountpoint);
-        mnt = m;
-        continue;
+        mnt = mnt_parent;
       }
-      break;
     }
 
-    if (dentry == parent) {
+    dentry_parent = BPF_CORE_READ(dentry, d_parent);
+    if (dentry_parent == dentry) {
       break;
     }
 
@@ -179,7 +176,7 @@ static __noinline int prepend_path_to_first_block(struct dentry *dentry, struct 
       offset += (d_name.len + 1);
     }
 
-    dentry = parent;
+    dentry = dentry_parent;
   }
 
   // the path must end with '\0'
@@ -192,12 +189,6 @@ static __noinline int prepend_path_to_first_block(struct dentry *dentry, struct 
   offset--;
   bpf_probe_read(&(buf->value[offset & (PATH_MAX - 1)]), 1, &slash);
 
-  // struct buffer *buf_test = get_file_buffer_test();
-  // if (buf_test == 0)
-  //   return PATH_MAX;
-  // bpf_probe_read_str(buf_test->value, PATH_MAX, &(buf->value[offset & (PATH_MAX - 1)]));
-  // DEBUG_PRINT("%s", buf_test->value);
-
   buf_offset->first_path = offset;
   return 0;
 }
@@ -205,9 +196,9 @@ static __noinline int prepend_path_to_first_block(struct dentry *dentry, struct 
 // prepend_path_to_second_block - parse the file path to the second block but ignores chroot'ed root.
 static __noinline int prepend_path_to_second_block(struct dentry *dentry, struct vfsmount *vfsmnt, struct buffer *buf, struct buffer_offset *buf_offset) {
   struct mount *mnt = real_mount(vfsmnt);
-  struct dentry *parent;
+  struct mount *mnt_parent;
+  struct dentry *dentry_parent;
   struct dentry *mnt_root;
-  struct mount *m;
   struct qstr d_name;
 
   char slash = '/';
@@ -216,20 +207,17 @@ static __noinline int prepend_path_to_second_block(struct dentry *dentry, struct
 
   #pragma unroll
   for (int i = 0; i < PATH_DEPTH_MAX; i++) {
-    parent = BPF_CORE_READ(dentry, d_parent);
-    mnt_root = BPF_CORE_READ(vfsmnt, mnt_root);
-
-    if (dentry == mnt_root) {
-      m = BPF_CORE_READ(mnt, mnt_parent);
-      if (mnt != m) {
+    mnt_root = BPF_CORE_READ(mnt, mnt).mnt_root;
+    if (mnt_root == dentry) {
+      mnt_parent = BPF_CORE_READ(mnt, mnt_parent);
+      if (mnt_parent != mnt) {
         dentry = BPF_CORE_READ(mnt, mnt_mountpoint);
-        mnt = m;
-        continue;
+        mnt = mnt_parent;
       }
-      break;
     }
 
-    if (dentry == parent) {
+    dentry_parent = BPF_CORE_READ(dentry, d_parent);
+    if (dentry_parent == dentry ) {
       break;
     }
 
@@ -263,7 +251,7 @@ static __noinline int prepend_path_to_second_block(struct dentry *dentry, struct
       offset += (d_name.len + 1);
     }
 
-    dentry = parent;
+    dentry = dentry_parent;
   }
 
   // the path must end with '\0'
