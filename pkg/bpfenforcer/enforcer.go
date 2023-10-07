@@ -56,6 +56,7 @@ const (
 	AA_PTRACE_READ             = 0x00000004
 	AA_MAY_BE_TRACED           = 0x00000008
 	AA_MAY_BE_READ             = 0x00000010
+	AA_MAY_UMOUNT              = 0x00000200
 )
 
 type bpfPathRule struct {
@@ -93,6 +94,7 @@ type BpfEnforcer struct {
 	ptraceLink      link.Link
 	mountLink       link.Link
 	moveMountLink   link.Link
+	umountLink      link.Link
 	log             logr.Logger
 }
 
@@ -287,6 +289,14 @@ func (enforcer *BpfEnforcer) StartEnforcing() error {
 	}
 	enforcer.moveMountLink = moveMountLink
 
+	umountLink, err := link.AttachLSM(link.LSMOptions{
+		Program: enforcer.objs.VarmorUmount,
+	})
+	if err != nil {
+		return err
+	}
+	enforcer.umountLink = umountLink
+
 	enforcer.log.Info("start enforcing")
 
 	return nil
@@ -304,6 +314,7 @@ func (enforcer *BpfEnforcer) StopEnforcing() {
 	enforcer.ptraceLink.Close()
 	enforcer.mountLink.Close()
 	enforcer.moveMountLink.Close()
+	enforcer.umountLink.Close()
 }
 
 func (enforcer *BpfEnforcer) SetCapableMap(mntNsID uint32, capability uint64) error {

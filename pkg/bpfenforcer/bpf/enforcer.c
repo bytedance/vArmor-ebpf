@@ -12,6 +12,7 @@
 #include "network.h"
 #include "ptrace.h"
 #include "mount.h"
+#include "perms.h"
 
 char __license[] SEC("license") = "GPL";
 
@@ -361,7 +362,7 @@ int BPF_PROG(varmor_move_mount, struct path *from_path, struct path *to_path) {
   // since v5.2. See https://lwn.net/Articles/759499/ 
   // We only care about the relocation use case of move_mount() for now, and
   // reuse the rules for mount().
-  unsigned long flags = MS_MOVE;
+  unsigned long mock_flags = MS_MOVE;
   buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX] = 'n';
   buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+1] = 'o';
   buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+2] = 'n';
@@ -371,9 +372,53 @@ int BPF_PROG(varmor_move_mount, struct path *from_path, struct path *to_path) {
   DEBUG_PRINT("from path: %s, length: %d, from path offset: %d", 
       &(buf->value[offset.first_path & (PATH_MAX-1)]), PATH_MAX-offset.first_path-1, offset.first_path);
   DEBUG_PRINT("from name: %s, length: %d", &(buf->value[PATH_MAX*2]), offset.first_name);
-  DEBUG_PRINT("fstype: %s", &(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX]));
-  DEBUG_PRINT("flags: %d", flags);
+  DEBUG_PRINT("mock fstype: %s", &(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX]));
+  DEBUG_PRINT("mock flags: %d", mock_flags);
 
   // Iterate all rules in the inner map
-  return iterate_move_mount_inner_map(vmount_inner, flags, buf, &offset);
+  return iterate_mount_inner_map_extra(vmount_inner, mock_flags, buf, &offset);
+}
+
+SEC("lsm/sb_umount")
+int BPF_PROG(varmor_umount, struct vfsmount *mnt, int flags) {
+  // Retrieve the current task
+  struct task_struct *current = (struct task_struct *)bpf_get_current_task();
+
+  // Whether the current task has mount rules
+  u32 mnt_ns = get_task_mnt_ns_id(current);
+  u32 *vmount_inner = get_mount_inner_map(mnt_ns);
+  if (vmount_inner == NULL)
+    return 0;
+
+  // Prepare buffer
+  struct buffer_offset offset = { .first_path = 0, .first_name = 0, .second_path = 0, .second_name = 0 };
+  struct buffer *buf = get_buffer();
+  if (buf == NULL)
+    return 0;
+
+  // Extract the source path from the from_path parameter provided by LSM hook point
+  struct mount *m = real_mount(mnt);
+  struct dentry *dentry = BPF_CORE_READ(m, mnt).mnt_root;
+  prepend_path_to_first_block(dentry, mnt, buf, &offset);
+
+  // Mock flags and fstype
+  // Linux mount-flags do not use the value 0x200, so we use it to identify umount
+  unsigned long mock_flags = AA_MAY_UMOUNT;
+  buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX] = 'n';
+  buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+1] = 'o';
+  buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+2] = 'n';
+  buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+3] = 'e';
+
+  DEBUG_PRINT("================ lsm/move_mount ================");
+  DEBUG_PRINT("umount path: %s, length: %d, umount path offset: %d", 
+      &(buf->value[offset.first_path & (PATH_MAX-1)]), PATH_MAX-offset.first_path-1, offset.first_path);
+  DEBUG_PRINT("umount name: %s, length: %d", &(buf->value[PATH_MAX*2]), offset.first_name);
+  DEBUG_PRINT("mock fstype: %s", &(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX]));
+  DEBUG_PRINT("mock flags: %d", mock_flags);
+
+  // Iterate all rules in the inner map
+  return iterate_mount_inner_map_extra(vmount_inner, mock_flags, buf, &offset);
+
+  return 0;
+
 }

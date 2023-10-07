@@ -72,4 +72,7 @@
 #define MS_SLAVE	      (1<<19)	  /* change to slave */
 #define MS_SHARED	      (1<<20)	  /* change to shared */
 
+// Custom mount-flags for umount()
+#define AA_MAY_UMOUNT  512
+
 #endif /* __PERMS_H */

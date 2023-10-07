@@ -92,7 +92,7 @@ static __noinline int iterate_mount_inner_map(u32 *vmount_inner, unsigned long f
   return 0;
 }
 
-static __noinline int iterate_move_mount_inner_map(u32 *vmount_inner, unsigned long flags, struct buffer *buf, struct buffer_offset *offset) {
+static __noinline int iterate_mount_inner_map_extra(u32 *vmount_inner, unsigned long flags, struct buffer *buf, struct buffer_offset *offset) {
   for (int inner_id=0; inner_id<MOUNT_INNER_MAP_ENTRIES_MAX; inner_id++) {
     // The key of the inner map must start from 0
     struct mount_rule *rule = get_mount_rule(vmount_inner, inner_id);
@@ -107,7 +107,7 @@ static __noinline int iterate_move_mount_inner_map(u32 *vmount_inner, unsigned l
     DEBUG_PRINT("rule fstype: %s", rule->fstype);
 
     // Permission check
-    if (flags & rule->mount_flags || (~flags) & rule->reverse_mount_flags) {
+    if (flags & rule->mount_flags) {
       if (mount_fstype_check(rule->fstype, &(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX])) && 
           old_path_check(&rule->pattern, buf, offset)) {
         DEBUG_PRINT("");
@@ -121,6 +121,5 @@ static __noinline int iterate_move_mount_inner_map(u32 *vmount_inner, unsigned l
   DEBUG_PRINT("access allowed");
   return 0;
 }
-
 
 #endif /* __MOUNT_H */
