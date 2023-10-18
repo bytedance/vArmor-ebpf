@@ -2,3 +2,5 @@
 coverage.out
 *.txt
 *.log
+vArmor-ebpf
+main.go

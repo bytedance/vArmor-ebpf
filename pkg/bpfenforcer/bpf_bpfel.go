@@ -59,6 +59,8 @@ type bpfProgramSpecs struct {
 	VarmorBprmCheckSecurity *ebpf.ProgramSpec `ebpf:"varmor_bprm_check_security"`
 	VarmorCapable           *ebpf.ProgramSpec `ebpf:"varmor_capable"`
 	VarmorFileOpen          *ebpf.ProgramSpec `ebpf:"varmor_file_open"`
+	VarmorMount             *ebpf.ProgramSpec `ebpf:"varmor_mount"`
+	VarmorMoveMount         *ebpf.ProgramSpec `ebpf:"varmor_move_mount"`
 	VarmorPathLink          *ebpf.ProgramSpec `ebpf:"varmor_path_link"`
 	VarmorPathLinkTail      *ebpf.ProgramSpec `ebpf:"varmor_path_link_tail"`
 	VarmorPathRename        *ebpf.ProgramSpec `ebpf:"varmor_path_rename"`
@@ -66,6 +68,7 @@ type bpfProgramSpecs struct {
 	VarmorPathSymlink       *ebpf.ProgramSpec `ebpf:"varmor_path_symlink"`
 	VarmorPtraceAccessCheck *ebpf.ProgramSpec `ebpf:"varmor_ptrace_access_check"`
 	VarmorSocketConnect     *ebpf.ProgramSpec `ebpf:"varmor_socket_connect"`
+	VarmorUmount            *ebpf.ProgramSpec `ebpf:"varmor_umount"`
 }
 
 // bpfMapSpecs contains maps before they are loaded into the kernel.
@@ -74,9 +77,10 @@ type bpfProgramSpecs struct {
 type bpfMapSpecs struct {
 	FileProgs    *ebpf.MapSpec `ebpf:"file_progs"`
 	V_bprmOuter  *ebpf.MapSpec `ebpf:"v_bprm_outer"`
+	V_buffer     *ebpf.MapSpec `ebpf:"v_buffer"`
 	V_capable    *ebpf.MapSpec `ebpf:"v_capable"`
-	V_fileBuffer *ebpf.MapSpec `ebpf:"v_file_buffer"`
 	V_fileOuter  *ebpf.MapSpec `ebpf:"v_file_outer"`
+	V_mountOuter *ebpf.MapSpec `ebpf:"v_mount_outer"`
 	V_netOuter   *ebpf.MapSpec `ebpf:"v_net_outer"`
 	V_ptrace     *ebpf.MapSpec `ebpf:"v_ptrace"`
 }
@@ -102,9 +106,10 @@ func (o *bpfObjects) Close() error {
 type bpfMaps struct {
 	FileProgs    *ebpf.Map `ebpf:"file_progs"`
 	V_bprmOuter  *ebpf.Map `ebpf:"v_bprm_outer"`
+	V_buffer     *ebpf.Map `ebpf:"v_buffer"`
 	V_capable    *ebpf.Map `ebpf:"v_capable"`
-	V_fileBuffer *ebpf.Map `ebpf:"v_file_buffer"`
 	V_fileOuter  *ebpf.Map `ebpf:"v_file_outer"`
+	V_mountOuter *ebpf.Map `ebpf:"v_mount_outer"`
 	V_netOuter   *ebpf.Map `ebpf:"v_net_outer"`
 	V_ptrace     *ebpf.Map `ebpf:"v_ptrace"`
 }
@@ -113,9 +118,10 @@ func (m *bpfMaps) Close() error {
 	return _BpfClose(
 		m.FileProgs,
 		m.V_bprmOuter,
+		m.V_buffer,
 		m.V_capable,
-		m.V_fileBuffer,
 		m.V_fileOuter,
+		m.V_mountOuter,
 		m.V_netOuter,
 		m.V_ptrace,
 	)
@@ -128,6 +134,8 @@ type bpfPrograms struct {
 	VarmorBprmCheckSecurity *ebpf.Program `ebpf:"varmor_bprm_check_security"`
 	VarmorCapable           *ebpf.Program `ebpf:"varmor_capable"`
 	VarmorFileOpen          *ebpf.Program `ebpf:"varmor_file_open"`
+	VarmorMount             *ebpf.Program `ebpf:"varmor_mount"`
+	VarmorMoveMount         *ebpf.Program `ebpf:"varmor_move_mount"`
 	VarmorPathLink          *ebpf.Program `ebpf:"varmor_path_link"`
 	VarmorPathLinkTail      *ebpf.Program `ebpf:"varmor_path_link_tail"`
 	VarmorPathRename        *ebpf.Program `ebpf:"varmor_path_rename"`
@@ -135,6 +143,7 @@ type bpfPrograms struct {
 	VarmorPathSymlink       *ebpf.Program `ebpf:"varmor_path_symlink"`
 	VarmorPtraceAccessCheck *ebpf.Program `ebpf:"varmor_ptrace_access_check"`
 	VarmorSocketConnect     *ebpf.Program `ebpf:"varmor_socket_connect"`
+	VarmorUmount            *ebpf.Program `ebpf:"varmor_umount"`
 }
 
 func (p *bpfPrograms) Close() error {
@@ -142,6 +151,8 @@ func (p *bpfPrograms) Close() error {
 		p.VarmorBprmCheckSecurity,
 		p.VarmorCapable,
 		p.VarmorFileOpen,
+		p.VarmorMount,
+		p.VarmorMoveMount,
 		p.VarmorPathLink,
 		p.VarmorPathLinkTail,
 		p.VarmorPathRename,
@@ -149,6 +160,7 @@ func (p *bpfPrograms) Close() error {
 		p.VarmorPathSymlink,
 		p.VarmorPtraceAccessCheck,
 		p.VarmorSocketConnect,
+		p.VarmorUmount,
 	)
 }
 
