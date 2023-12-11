@@ -418,7 +418,4 @@ int BPF_PROG(varmor_umount, struct vfsmount *mnt, int flags) {
 
   // Iterate all rules in the inner map
   return iterate_mount_inner_map_extra(vmount_inner, mock_flags, buf, &offset);
-
-  return 0;
-
 }
