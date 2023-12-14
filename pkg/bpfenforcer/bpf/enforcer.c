@@ -421,7 +421,7 @@ int BPF_PROG(varmor_umount, struct vfsmount *mnt, int flags) {
   buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+3] = 'e';
   buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+4] = '\0';
 
-  DEBUG_PRINT("================ lsm/move_mount ================");
+  DEBUG_PRINT("================ lsm/sb_umount ================");
   DEBUG_PRINT("umount path: %s, length: %d, umount path offset: %d", 
       &(buf->value[offset.first_path & (PATH_MAX-1)]), PATH_MAX-offset.first_path-1, offset.first_path);
   DEBUG_PRINT("umount name: %s, length: %d", &(buf->value[PATH_MAX*2]), offset.first_name);
