@@ -331,7 +331,17 @@ int BPF_PROG(varmor_mount, char *dev_name, struct path *path, char *type, unsign
   DEBUG_PRINT("offset: %d, length: %d", offset.first_path, offset.first_path-1);
   DEBUG_PRINT("dev name: %s, length: %d", &(buf->value[PATH_MAX*2]), offset.first_name);
   DEBUG_PRINT("fstype: %s", &(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX]));
-  DEBUG_PRINT("flags: %d", flags);
+  DEBUG_PRINT("flags: 0x%x", flags);
+
+  if (flags & 
+      (MS_REMOUNT | MS_BIND | MS_SHARED | MS_PRIVATE | MS_SLAVE | MS_UNBINDABLE | MS_MOVE | AA_MAY_UMOUNT)) {
+    DEBUG_PRINT("force the fstype to 'none'");
+    buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX] = 'n';
+    buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+1] = 'o';
+    buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+2] = 'n';
+    buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+3] = 'e';
+    buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+4] = '\0';
+  }
 
   // Iterate all rules in the inner map
   return iterate_mount_inner_map(vmount_inner, flags, buf, &offset);
@@ -367,13 +377,14 @@ int BPF_PROG(varmor_move_mount, struct path *from_path, struct path *to_path) {
   buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+1] = 'o';
   buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+2] = 'n';
   buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+3] = 'e';
+  buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+4] = '\0';
 
   DEBUG_PRINT("================ lsm/move_mount ================");
   DEBUG_PRINT("from path: %s, length: %d, from path offset: %d", 
       &(buf->value[offset.first_path & (PATH_MAX-1)]), PATH_MAX-offset.first_path-1, offset.first_path);
   DEBUG_PRINT("from name: %s, length: %d", &(buf->value[PATH_MAX*2]), offset.first_name);
   DEBUG_PRINT("mock fstype: %s", &(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX]));
-  DEBUG_PRINT("mock flags: %d", mock_flags);
+  DEBUG_PRINT("mock flags: 0x%x", mock_flags);
 
   // Iterate all rules in the inner map
   return iterate_mount_inner_map_extra(vmount_inner, mock_flags, buf, &offset);
@@ -408,13 +419,14 @@ int BPF_PROG(varmor_umount, struct vfsmount *mnt, int flags) {
   buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+1] = 'o';
   buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+2] = 'n';
   buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+3] = 'e';
+  buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+4] = '\0';
 
   DEBUG_PRINT("================ lsm/sb_umount ================");
   DEBUG_PRINT("umount path: %s, length: %d, umount path offset: %d", 
       &(buf->value[offset.first_path & (PATH_MAX-1)]), PATH_MAX-offset.first_path-1, offset.first_path);
   DEBUG_PRINT("umount name: %s, length: %d", &(buf->value[PATH_MAX*2]), offset.first_name);
   DEBUG_PRINT("mock fstype: %s", &(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX]));
-  DEBUG_PRINT("mock flags: %d", mock_flags);
+  DEBUG_PRINT("mock flags: 0x%x", mock_flags);
 
   // Iterate all rules in the inner map
   return iterate_mount_inner_map_extra(vmount_inner, mock_flags, buf, &offset);

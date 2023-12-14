@@ -407,7 +407,7 @@ func Test_VarmorPtraceAccessCheck(t *testing.T) {
 	// assert.NilError(t, err)
 }
 
-func Test_VarmorMountAccessCheck(t *testing.T) {
+func Test_VarmorBindMountAccessCheck(t *testing.T) {
 	log.SetLogger(klogr.New())
 	tracer := NewBpfEnforcer(log.Log.WithName("ebpf"))
 	err := tracer.InitEBPF()
@@ -418,14 +418,42 @@ func Test_VarmorMountAccessCheck(t *testing.T) {
 	assert.NilError(t, err)
 	defer tracer.StopEnforcing()
 
-	// rule, err := newBpfMountRule("/sys/fs/cgroup/devices", "*", 0, unix.MS_RDONLY)
-	rule, err := newBpfMountRule("/proc**", "none", unix.MS_MOVE|AA_MAY_UMOUNT, 0)
+	rule, err := newBpfMountRule("/proc**", "none", unix.MS_BIND, 0)
 	assert.NilError(t, err)
 
-	err = tracer.SetMountMap(4026532844, rule)
+	err = tracer.SetMountMap(4026533649, rule)
 	assert.NilError(t, err)
 
 	stopTicker := time.NewTicker(5 * time.Second)
+	<-stopTicker.C
+
+	// err = fmt.Errorf("forced error")
+	// assert.NilError(t, err)
+}
+
+func Test_VarmorMountNewProcAccessCheck(t *testing.T) {
+	log.SetLogger(klogr.New())
+	tracer := NewBpfEnforcer(log.Log.WithName("ebpf"))
+	err := tracer.InitEBPF()
+	assert.NilError(t, err)
+	defer tracer.RemoveEBPF()
+
+	err = tracer.StartEnforcing()
+	assert.NilError(t, err)
+	defer tracer.StopEnforcing()
+
+	flags := 0xFFFFFFFF &^ unix.MS_REMOUNT &^
+		unix.MS_BIND &^ unix.MS_SHARED &^
+		unix.MS_PRIVATE &^ unix.MS_SLAVE &^
+		unix.MS_UNBINDABLE &^ unix.MS_MOVE &^ AA_MAY_UMOUNT
+
+	rule, err := newBpfMountRule("**", "proc", uint32(flags), 0xFFFFFFFF)
+	assert.NilError(t, err)
+
+	err = tracer.SetMountMap(4026533649, rule)
+	assert.NilError(t, err)
+
+	stopTicker := time.NewTicker(50 * time.Second)
 	<-stopTicker.C
 
 	// err = fmt.Errorf("forced error")
