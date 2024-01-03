@@ -18,6 +18,7 @@ package behavior
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -46,4 +47,25 @@ func sysctl_write(path string, value uint64) error {
 
 	_, err = file.WriteString(fmt.Sprintf("%d", value))
 	return err
+}
+
+func readMntNsID(pid uint32) (uint32, error) {
+	path := fmt.Sprintf("/proc/%d/ns/mnt", pid)
+	realPath, err := os.Readlink(path)
+	if err != nil {
+		return 0, err
+	}
+
+	index := strings.Index(realPath, "[")
+	if index == -1 {
+		return 0, fmt.Errorf(fmt.Sprintf("fatel error: can not parser mnt ns id from: %s", realPath))
+	}
+
+	id := realPath[index+1 : len(realPath)-1]
+	u64, err := strconv.ParseUint(id, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf(fmt.Sprintf("fatel error: can not transform mnt ns id (%s) to uint64 type", realPath))
+	}
+
+	return uint32(u64), nil
 }
