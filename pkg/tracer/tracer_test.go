@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package behavior
+package tracer
 
 import (
 	"fmt"
@@ -51,24 +51,25 @@ func Test_customData(t *testing.T) {
 
 	stopTicker := time.NewTicker(3 * time.Second)
 	runTicker := time.NewTicker(2 * time.Second)
-	count := 0
+
+	var mntNsID, mntCount, initPid, pidCount uint32
 
 LOOP:
 	for {
 		select {
 		case <-runTicker.C:
-			cmd := exec.Command("hostname")
-			cmd.Env = append(cmd.Env, "VARMOR=TEST")
-			go cmd.Run()
+			cmd := exec.Command("ping", "-c", "10", "127.0.0.1")
+			cmd.Start()
+			initPid = uint32(cmd.Process.Pid)
+			mntNsID, err = readMntNsID(uint32(cmd.Process.Pid))
+			assert.NilError(t, err)
 
 		case <-stopTicker.C:
 			break LOOP
 
 		case event := <-eventCh:
-			len := indexOfZero(event.Env[:])
-			env := string(event.Env[:len])
 
-			len = indexOfZero(event.ParentTask[:])
+			len := indexOfZero(event.ParentTask[:])
 			parentTask := string(event.ParentTask[:len])
 
 			len = indexOfZero(event.ChildTask[:])
@@ -83,17 +84,23 @@ LOOP:
 			} else {
 				eventType = "sched_process_exec"
 			}
-			output := fmt.Sprintf("%-24s |%-12d %-12d %-20s | %-12d %-12d %-20s | %-20s %-12d %s\n",
+			output := fmt.Sprintf("%-24s |%-12d %-12d %-20s | %-12d %-12d %-20s | %-12d %s\n",
 				eventType,
 				event.ParentPid, event.ParentTgid, parentTask,
 				event.ChildPid, event.ChildTgid, childTask,
-				env, event.Num, fileName,
+				event.MntNsId, fileName,
 			)
 			fmt.Println(output)
-			if env == "VARMOR=TEST" {
-				count += 1
+
+			if event.MntNsId == mntNsID {
+				mntCount += 1
+			}
+
+			if event.ParentTgid == initPid || event.ChildTgid == initPid {
+				pidCount += 1
 			}
 		}
 	}
-	assert.Equal(t, true, count > 0)
+	assert.Equal(t, true, mntCount > 0)
+	assert.Equal(t, true, pidCount > 0)
 }

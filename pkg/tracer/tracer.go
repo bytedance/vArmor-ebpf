@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package behavior
+package tracer
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc $BPF_CLANG -cflags $BPF_CFLAGS -target bpfel -type event bpf bpf/tracer.c -- -I./bpf/headers
 
@@ -206,8 +206,8 @@ func (tracer *EbpfTracer) traceSyscall() {
 	}
 }
 
-func (tracer *EbpfTracer) AddEventCh(uniqueID string, ch chan bpfEvent) {
-	tracer.eventChs[uniqueID] = ch
+func (tracer *EbpfTracer) AddEventCh(name string, ch chan bpfEvent) {
+	tracer.eventChs[name] = ch
 
 	if len(tracer.eventChs) == 1 && !tracer.enabled {
 		err := tracer.startTracing()
@@ -217,8 +217,8 @@ func (tracer *EbpfTracer) AddEventCh(uniqueID string, ch chan bpfEvent) {
 	}
 }
 
-func (tracer *EbpfTracer) DeleteEventCh(uniqueID string) {
-	delete(tracer.eventChs, uniqueID)
+func (tracer *EbpfTracer) DeleteEventCh(name string) {
+	delete(tracer.eventChs, name)
 
 	if len(tracer.eventChs) == 0 {
 		tracer.stopTracing()

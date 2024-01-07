@@ -22,14 +22,17 @@ struct event {
     u32 parent_tgid;
     u32 child_pid;
     u32 child_tgid;
+    u32 mnt_ns_id;
     unsigned char parent_task[TASK_COMM_LEN];
     unsigned char child_task[TASK_COMM_LEN];
     unsigned char filename[MAX_FILENAME_LEN];
-    unsigned char env[MAX_ENV_LEN];
-    u32 num;
 };
 
 const struct event *unused __attribute__((unused));
+
+static u32 get_task_mnt_ns_id(struct task_struct *task) {
+  return BPF_CORE_READ(task, nsproxy, mnt_ns, ns).inum;
+}
 
 // https://elixir.bootlin.com/linux/v5.4.196/source/kernel/fork.c#L2388
 // https://elixir.bootlin.com/linux/v5.4.196/source/include/trace/events/sched.h#L287
@@ -49,35 +52,8 @@ int tracepoint__sched__sched_process_fork(struct bpf_raw_tracepoint_args *ctx)
     BPF_CORE_READ_INTO(&event.child_pid, child, pid);
     BPF_CORE_READ_INTO(&event.child_tgid, child, tgid);
     BPF_CORE_READ_STR_INTO(&event.child_task, child, comm);
+    event.mnt_ns_id = get_task_mnt_ns_id(child);
 
-    u64 env_start = 0;
-    u64 env_end = 0;
-    int i = 0;
-    int len = 0;
-
-    BPF_CORE_READ_INTO(&env_start, parent, mm, env_start);
-    BPF_CORE_READ_INTO(&env_end, parent, mm, env_end);
-    
-    while(i < MAX_ENV_EXTRACT_LOOP_COUNT && env_start < env_end ) {
-        len = bpf_probe_read_kernel_str(&event.env, sizeof(event.env), (void *)env_start);
-        if ( len <= 0 ) {
-            break;
-        } else if ( event.env[0] == 'V' && 
-                    event.env[1] == 'A' && 
-                    event.env[2] == 'R' && 
-                    event.env[3] == 'M' && 
-                    event.env[4] == 'O' && 
-                    event.env[5] == 'R' && 
-                    event.env[6] == '=' ) {
-            break;
-        } else {
-            env_start = env_start + len;
-            event.env[0] = 0;
-            i++;
-        }
-    }
-    
-    event.num = i;
     bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
 
     return 0;
@@ -103,36 +79,8 @@ int tracepoint__sched__sched_process_exec(struct bpf_raw_tracepoint_args *ctx)
     BPF_CORE_READ_INTO(&event.child_tgid, current, tgid);
     BPF_CORE_READ_STR_INTO(&event.child_task, current, comm);
     bpf_probe_read_kernel_str(&event.filename, sizeof(event.filename), BPF_CORE_READ(bprm, filename));
-
-    u64 env_start = 0;
-    u64 env_end = 0;
-    int i = 0;
-    int len = 0;
-
-    BPF_CORE_READ_INTO(&env_start, current, mm, env_start);
-    BPF_CORE_READ_INTO(&env_end, current, mm, env_end);
-    
-    while(i < MAX_ENV_EXTRACT_LOOP_COUNT && env_start < env_end ) {
-        len = bpf_probe_read_user_str(&event.env, sizeof(event.env), (void *)env_start);
-
-        if ( len <= 0 ) {
-            break;
-        } else if ( event.env[0] == 'V' && 
-                    event.env[1] == 'A' && 
-                    event.env[2] == 'R' && 
-                    event.env[3] == 'M' && 
-                    event.env[4] == 'O' && 
-                    event.env[5] == 'R' && 
-                    event.env[6] == '=' ) {
-            break;
-        } else {
-            env_start = env_start + len;
-            event.env[0] = 0;
-            i++;
-        }
-    }
-
-    event.num = i;        
+    event.mnt_ns_id = get_task_mnt_ns_id(current);
+       
     bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
     return 0;
 }
