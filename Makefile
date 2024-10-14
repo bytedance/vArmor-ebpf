@@ -29,7 +29,7 @@ ifeq (, $(shell which goimports))
 	@{ \
 	echo "goimports not found!";\
 	echo "installing goimports...";\
-	go get golang.org/x/tools/cmd/goimports;\
+	go install golang.org/x/tools/cmd/goimports@latest
 	}
 else
 GO_IMPORTS=$(shell which goimports)
@@ -37,6 +37,7 @@ endif
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
+	@echo "[+] Run go fmt against code."
 	go fmt ./... && $(GO_IMPORTS) -w ./
 
 .PHONY: vet
