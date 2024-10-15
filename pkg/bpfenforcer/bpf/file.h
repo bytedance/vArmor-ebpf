@@ -11,6 +11,7 @@
 #include "enforcer.h"
 #include "perms.h"
 
+// Maximum rule count for file access control
 #define FILE_INNER_MAP_ENTRIES_MAX 50
 
 typedef unsigned int fmode_t;
@@ -23,6 +24,7 @@ struct {
 } v_file_outer SEC(".maps");
 
 struct path_rule {
+  u32 mode;
   u32 permissions;
   struct path_pattern pattern;
 };
@@ -46,11 +48,13 @@ static __noinline u32 map_file_to_perms(struct file *file) {
   unsigned int flags = BPF_CORE_READ(file, f_flags);
   fmode_t mode = BPF_CORE_READ(file, f_mode);
 
+  DEBUG_PRINT("map_file_to_perms() - flags: 0x%x", flags);
+  DEBUG_PRINT("map_file_to_perms() - mode: 0x%x", mode);
+
   if (mode & FMODE_WRITE)
     perms |= MAY_WRITE;
   if (mode & FMODE_READ)
     perms |= MAY_READ;
-  
   if ((flags & O_APPEND) && (perms & MAY_WRITE))
     perms = (perms & ~MAY_WRITE) | MAY_APPEND;
   /* trunc implies write permission */
@@ -59,10 +63,11 @@ static __noinline u32 map_file_to_perms(struct file *file) {
   if (flags & O_CREAT)
     perms |= AA_MAY_CREATE;
 
+  DEBUG_PRINT("map_file_to_perms() - perms: 0x%x", perms);
   return perms;
 }
 
-static __always_inline int iterate_file_inner_map_for_file(u32 *vfile_inner, struct buffer *buf, struct buffer_offset *offset, u32 requested_perms) {
+static __always_inline int iterate_file_inner_map_for_file(u32 *vfile_inner, struct buffer *buf, struct buffer_offset *offset, u32 requested_perms, u32 mnt_ns) {
   for(int inner_id=0; inner_id<FILE_INNER_MAP_ENTRIES_MAX; inner_id++) {
     // The key of the inner map must start from 0
     struct path_rule *rule = get_file_rule(vfile_inner, inner_id);
@@ -80,6 +85,23 @@ static __always_inline int iterate_file_inner_map_for_file(u32 *vfile_inner, str
       if (old_path_check(&rule->pattern, buf, offset)) {
         DEBUG_PRINT("");
         DEBUG_PRINT("access denied");
+        
+        // Submit the audit event
+        if (rule->mode & AUDIT_MODE) {
+          struct audit_event *e;
+          e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
+          if (e) {
+            DEBUG_PRINT("write audit event to ringbuf");
+            e->mode = AUDIT_MODE;
+            e->type = FILE_TYPE;
+            e->mnt_ns = mnt_ns;
+            e->tgid = bpf_get_current_pid_tgid()>>32;
+            e->ktime = bpf_ktime_get_boot_ns();
+            e->path.permissions = requested_perms;
+            bpf_probe_read_kernel_str(&e->path.path, PATH_MAX-offset->first_path & (PATH_MAX-1), &(buf->value[offset->first_path & (PATH_MAX-1)]));
+            bpf_ringbuf_submit(e, 0);
+          }
+        }
         return -EPERM;
       }
     }
@@ -90,7 +112,7 @@ static __always_inline int iterate_file_inner_map_for_file(u32 *vfile_inner, str
   return 0;
 }
 
-static __noinline int iterate_file_inner_map_for_path_pair(u32 *vfile_inner, struct buffer *buf, struct buffer_offset *offset, u32 requested_perms) {
+static __noinline int iterate_file_inner_map_for_path_pair(u32 *vfile_inner, struct buffer *buf, struct buffer_offset *offset, u32 requested_perms, u32 mnt_ns) {
   for(int inner_id=0; inner_id<FILE_INNER_MAP_ENTRIES_MAX; inner_id++) {
     // The key of the inner map must start from 0
     struct path_rule *rule = get_file_rule(vfile_inner, inner_id);
@@ -108,6 +130,23 @@ static __noinline int iterate_file_inner_map_for_path_pair(u32 *vfile_inner, str
       if (old_path_check(&rule->pattern, buf, offset)) {
         DEBUG_PRINT("");
         DEBUG_PRINT("access denied");
+
+        // Submit the audit event
+        if (rule->mode & AUDIT_MODE) {
+          struct audit_event *e;
+          e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
+          if (e) {
+            DEBUG_PRINT("write audit event to ringbuf");
+            e->mode = AUDIT_MODE;
+            e->type = FILE_TYPE;
+            e->mnt_ns = mnt_ns;
+            e->tgid = bpf_get_current_pid_tgid()>>32;
+            e->ktime = bpf_ktime_get_boot_ns();
+            e->path.permissions = AA_MAY_READ;
+            bpf_probe_read_kernel_str(&e->path.path, PATH_MAX-offset->first_path & (PATH_MAX-1), &(buf->value[offset->first_path & (PATH_MAX-1)]));
+            bpf_ringbuf_submit(e, 0);
+          }
+        }
         return -EPERM;
       }
     }
@@ -116,6 +155,23 @@ static __noinline int iterate_file_inner_map_for_path_pair(u32 *vfile_inner, str
       if (new_path_check(&rule->pattern, buf, offset)) {
         DEBUG_PRINT("");
         DEBUG_PRINT("access denied");
+
+        // Submit the audit event
+        if (rule->mode & AUDIT_MODE) {
+          struct audit_event *e;
+          e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
+          if (e) {
+            DEBUG_PRINT("write audit event to ringbuf");
+            e->mode = AUDIT_MODE;
+            e->type = FILE_TYPE;
+            e->mnt_ns = mnt_ns;
+            e->tgid = bpf_get_current_pid_tgid()>>32;
+            e->ktime = bpf_ktime_get_boot_ns();
+            e->path.permissions = AA_MAY_WRITE;
+            bpf_probe_read_kernel_str(&e->path.path, PATH_MAX*2-offset->second_path & (PATH_MAX-1), &(buf->value[offset->second_path & (PATH_MAX*2-1)]));
+            bpf_ringbuf_submit(e, 0);
+          }
+        }
         return -EPERM;
       }
     }
@@ -144,7 +200,7 @@ int BPF_PROG(varmor_path_link_tail, struct dentry *old_dentry, const struct path
   }
 
   // Iterate all rules in the inner map
-  return iterate_file_inner_map_for_path_pair(vfile_inner, buf, &offset, AA_MAY_LINK);
+  return iterate_file_inner_map_for_path_pair(vfile_inner, buf, &offset, AA_MAY_LINK, mnt_ns);
 }
 
 SEC("lsm/path_rename")
@@ -165,7 +221,7 @@ int BPF_PROG(varmor_path_rename_tail, const struct path *old_dir, struct dentry 
   }
 
   // Iterate all rules in the inner map
-  return iterate_file_inner_map_for_path_pair(vfile_inner, buf, &offset, AA_MAY_RENAME);
+  return iterate_file_inner_map_for_path_pair(vfile_inner, buf, &offset, AA_MAY_RENAME, mnt_ns);
 }
 
 #endif /* __FILE_H */

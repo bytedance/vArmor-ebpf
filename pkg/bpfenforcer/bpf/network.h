@@ -12,7 +12,9 @@
 #include "enforcer.h"
 #include "perms.h"
 
+// Maximum rule count for network access control
 #define NET_INNER_MAP_ENTRIES_MAX 50
+
 #define AF_UNIX		1	  /* Unix domain sockets 		*/
 #define AF_INET		2	  /* Internet IP Protocol 	*/
 #define AF_INET6	10	/* IP version 6			*/

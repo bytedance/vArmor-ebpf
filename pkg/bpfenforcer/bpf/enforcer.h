@@ -9,7 +9,7 @@
 #include "bpf_tracing.h"
 #include "bpf_core_read.h"
 
-// #define DEBUG 1
+#define DEBUG 1
 #ifdef DEBUG
 #define DEBUG_PRINT(fmt, args...) \
   bpf_printk(fmt, ##args)
@@ -26,12 +26,30 @@
   })
 
 #define	EPERM 1
+#define NAME_MAX      256
+#define PATH_MAX      4096
+
+// BPF enforcer running mode.
+#define ENFORCE_MODE  0x00000001
+#define AUDIT_MODE    0x00000002
+#define COMPLAIN_MODE 0x00000004
+
+// Maximum containers count supported by BPF enforcer on node.
 #define OUTER_MAP_ENTRIES_MAX 100
-#define FILE_PATH_PATTERN_SIZE_MAX 64
-#define BUFFER_MAX 4096*3
-#define NAME_MAX 256
-#define PATH_MAX 4096
+
+// Maximum size of the per-CPU array buffer to cache paths and names etc.
+#define BUFFER_MAX PATH_MAX*3
+
+// Maximum size of the bpf ring buffer for auditing.
+#define RING_BUFFER_MAX 4096*256
+
+// Maximum extraction depth of the paths.
 #define PATH_DEPTH_MAX 30
+
+// Maximum size of the match pattern.
+#define FILE_PATH_PATTERN_SIZE_MAX  64
+
+// Matching flags.
 #define PRECISE_MATCH 0x00000001
 #define GREEDY_MATCH  0x00000002
 #define PREFIX_MATCH  0x00000004
@@ -40,6 +58,11 @@
 #define IPV4_MATCH    0x00000040
 #define IPV6_MATCH    0x00000080
 #define PORT_MATCH    0x00000100
+
+// Event type
+#define FILE_TYPE       0x00000001
+#define BPRM_TYPE       0x00000002
+#define CAPABILITY_TYPE 0x00000004
 
 /*
   We use the buffer to cache file path and file name etc.
@@ -65,6 +88,29 @@ struct {
   __type(value, struct buffer);
   __uint(max_entries, 1);
 } v_buffer SEC(".maps");
+
+struct v_path {
+  u32 permissions;
+  unsigned char path[PATH_MAX];
+};
+
+struct audit_event {
+  u32 mode;
+  u32 type;
+  u32 mnt_ns;
+  u32 tgid;
+  u64 ktime;
+  u64 capability;
+  struct v_path path;
+  struct v_path path2;
+};
+
+const struct audit_event *unused __attribute__((unused));
+
+struct {
+  __uint(type, BPF_MAP_TYPE_RINGBUF);
+  __uint(max_entries, RING_BUFFER_MAX);
+} v_audit_rb SEC(".maps");
 
 struct buffer_offset {
   u32 first_path;

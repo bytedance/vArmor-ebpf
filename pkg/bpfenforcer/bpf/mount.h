@@ -11,7 +11,9 @@
 #include "enforcer.h"
 #include "perms.h"
 
+// Maximum rule count for network access control
 #define MOUNT_INNER_MAP_ENTRIES_MAX 50
+// Maximum count of filesystem type
 #define FILE_SYSTEM_TYPE_MAX 16
 
 struct {

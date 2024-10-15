@@ -4,3 +4,4 @@ coverage.out
 *.log
 vArmor-ebpf
 main.go
+settings.json

@@ -41,8 +41,8 @@ int BPF_PROG(varmor_capable, const struct cred *cred, struct user_namespace *ns,
 
   // Whether the current task has file access control rules
   u32 mnt_ns = get_task_mnt_ns_id(current);
-  u64 *deny_caps = get_capability_rules(mnt_ns);
-  if (deny_caps == 0)
+  struct capability_rule *rule = get_capability_rules(mnt_ns);
+  if (rule == 0)
     return ret;
 
   DEBUG_PRINT("================ lsm/capable ================");
@@ -50,7 +50,7 @@ int BPF_PROG(varmor_capable, const struct cred *cred, struct user_namespace *ns,
   // Permission check
   u64 request_cap_mask = CAP_TO_MASK(cap);
 
-  if (*deny_caps & request_cap_mask) {
+  if (rule->caps & request_cap_mask) {
     struct user_namespace *current_ns = get_task_user_ns(current);
     kernel_cap_t current_cap_effective = get_task_cap_effective(current);
     // We utilize casts to ensure compatibility with kernel 6.3+
@@ -70,6 +70,23 @@ int BPF_PROG(varmor_capable, const struct cred *cred, struct user_namespace *ns,
     }
 
     DEBUG_PRINT("task(mnt ns: %u) is not allowed to use capability: 0x%x", mnt_ns, cap);
+
+    // Submit the audit event
+    if (rule->mode & AUDIT_MODE) {
+      struct audit_event *e;
+      e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
+      if (e) {
+        DEBUG_PRINT("write audit event to ringbuf");
+        e->mode = AUDIT_MODE;
+        e->type = CAPABILITY_TYPE;
+        e->mnt_ns = mnt_ns;
+        e->tgid = bpf_get_current_pid_tgid()>>32;
+        e->ktime = bpf_ktime_get_boot_ns();
+        e->capability = cap;
+        bpf_ringbuf_submit(e, 0);
+      }
+    }
+
     return -EPERM;
   }
 
@@ -109,7 +126,7 @@ int BPF_PROG(varmor_file_open, struct file *file) {
   u32 requested_perms = map_file_to_perms(file);
 
   // Iterate all rules in the inner map
-  return iterate_file_inner_map_for_file(vfile_inner, buf, &offset, requested_perms);
+  return iterate_file_inner_map_for_file(vfile_inner, buf, &offset, requested_perms, mnt_ns);
 }
 
 SEC("lsm/path_symlink")
@@ -138,7 +155,7 @@ int BPF_PROG(varmor_path_symlink, const struct path *dir, struct dentry *dentry,
   DEBUG_PRINT("file name: %s, length: %d", &(buf->value[PATH_MAX*2]), offset.first_name);
 
   // Iterate all rules in the inner map
-  return iterate_file_inner_map_for_file(vfile_inner, buf, &offset, AA_MAY_WRITE);
+  return iterate_file_inner_map_for_file(vfile_inner, buf, &offset, AA_MAY_WRITE, mnt_ns);
 }
 
 SEC("lsm/path_link")
@@ -248,7 +265,7 @@ int BPF_PROG(varmor_bprm_check_security, struct linux_binprm *bprm, int ret) {
   DEBUG_PRINT("offset: %d, length: %d", offset.first_path, offset.first_path-1);
   DEBUG_PRINT("file name: %s, length: %d", &(buf->value[PATH_MAX*2]), offset.first_name);
 
-  return iterate_bprm_inner_map_for_executable(vbprm_inner, buf, &offset);
+  return iterate_bprm_inner_map_for_executable(vbprm_inner, buf, &offset, mnt_ns);
 }
 
 SEC("lsm/socket_connect")
