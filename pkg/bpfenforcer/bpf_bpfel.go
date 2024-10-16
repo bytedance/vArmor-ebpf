@@ -27,6 +27,13 @@ type bpfAuditEvent struct {
 		Permissions uint32
 		Path        [4096]uint8
 	}
+	Egress struct {
+		SaFamily uint32
+		SockType uint32
+		Sin6Addr [16]uint8
+		SinAddr  uint32
+		Port     uint32
+	}
 }
 
 type bpfBuffer struct{ Value [12288]uint8 }

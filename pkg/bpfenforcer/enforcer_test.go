@@ -71,7 +71,7 @@ func Test_VarmorCapable(t *testing.T) {
 
 	go tracer.ReadFromAuditEventRingBuf()
 
-	stopTicker := time.NewTicker(50 * time.Second)
+	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
 
 	fmt.Println("allow tasks(mnt ns id: 4026532792) to use CAP_NET_RAW | CAP_SYS_ADMIN")
@@ -220,7 +220,7 @@ func Test_VarmorFileRule(t *testing.T) {
 
 	go tracer.ReadFromAuditEventRingBuf()
 
-	stopTicker := time.NewTicker(50 * time.Second)
+	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
 
 	err = fmt.Errorf("forced error")
@@ -349,7 +349,7 @@ func Test_newBpfNetworkRule(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			rule, err := newBpfNetworkRule(tc.cidr, tc.address, tc.port)
+			rule, err := newBpfNetworkRule(AuditMode, tc.cidr, tc.address, tc.port)
 			if err != nil {
 				assert.Equal(t, err.Error(), tc.expectedErr.Error())
 			} else {
@@ -377,18 +377,20 @@ func Test_VarmorNetCheckSecurity(t *testing.T) {
 	assert.NilError(t, err)
 	defer tracer.StopEnforcing()
 
-	// rule, err := newBpfNetworkRule("", "11.30.31.68", 6443)
-	// rule, err := newBpfNetworkRule("", "fdbd:dc01:ff:307:9329:268d:3a27:2ca7", 0)
-	// rule, err := newBpfNetworkRule("", "", 10250)
+	// rule, err := newBpfNetworkRule(AuditMode, "", "11.30.31.68", 6443)
+	// rule, err := newBpfNetworkRule(AuditMode, "", "fdbd:dc01:ff:307:9329:268d:3a27:2ca7", 0)
+	// rule, err := newBpfNetworkRule(AuditMode, "", "", 10250)
 	// CIDR: 172.0.0.0/11 (172.0.0.0 ~ 172.31.255.255) test with 172.31.0.1 and 172.32.0.1
-	// rule, err := newBpfNetworkRule("172.16.0.0/11", "", 0)
+	// rule, err := newBpfNetworkRule(AuditMode, "172.16.0.0/11", "", 0)
 	// CIDR: 2001:db8::/31 (2001:db8:: ~ 2001:db9:ffff:ffff:ffff:ffff:ffff:ffff ) test with 2001:db8:1:: and 2001:dba:1::
-	// rule, err := newBpfNetworkRule("2001:db8::/31", "", 0)
-	rule, err := newBpfNetworkRule("192.168.1.0/24", "", 0)
+	// rule, err := newBpfNetworkRule(AuditMode, "2001:db8::/31", "", 0)
+	rule, err := newBpfNetworkRule(AuditMode, "192.168.1.0/24", "", 0)
 	assert.NilError(t, err)
 
-	err = tracer.SetNetMap(4026533559, rule)
+	err = tracer.SetNetMap(4026532792, rule)
 	assert.NilError(t, err)
+
+	go tracer.ReadFromAuditEventRingBuf()
 
 	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
@@ -464,7 +466,7 @@ func Test_VarmorMountNewProcAccessCheck(t *testing.T) {
 	err = tracer.SetMountMap(4026533649, rule)
 	assert.NilError(t, err)
 
-	stopTicker := time.NewTicker(50 * time.Second)
+	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
 
 	// err = fmt.Errorf("forced error")

@@ -59,7 +59,7 @@ const (
 
 	// NetRuleSize is the size of `struct net_rule` in BPF code, it's
 	// also the value size of the inner map for network access control.
-	NetRuleSize = 4*2 + IpAddressSize*2
+	NetRuleSize = 4*3 + IpAddressSize*2
 
 	// MaxFileSystemTypeLength is the max length of fstype pattern,
 	// it's equal to FILE_SYSTEM_TYPE_MAX in BPF code
@@ -99,6 +99,7 @@ const (
 	FileType       = 0x00000001
 	BprmType       = 0x00000002
 	CapabilityType = 0x00000004
+	NetworkType    = 0x00000008
 )
 
 type bpfPathRule struct {
@@ -110,6 +111,7 @@ type bpfPathRule struct {
 }
 
 type bpfNetworkRule struct {
+	Mode    uint32
 	Flags   uint32
 	Address [IpAddressSize]byte
 	Mask    [IpAddressSize]byte
@@ -532,7 +534,7 @@ func (enforcer *BpfEnforcer) ClearBprmMap(mntNsID uint32) error {
 	return enforcer.objs.V_bprmOuter.Delete(&mntNsID)
 }
 
-func newBpfNetworkRule(cidr string, ipAddress string, port uint32) (*bpfNetworkRule, error) {
+func newBpfNetworkRule(mode uint32, cidr string, ipAddress string, port uint32) (*bpfNetworkRule, error) {
 	// Pre-check
 	if cidr == "" && ipAddress == "" && port == 0 {
 		return nil, fmt.Errorf("cidr, ipAddress and port cannot be empty at the same time")
@@ -547,6 +549,8 @@ func newBpfNetworkRule(cidr string, ipAddress string, port uint32) (*bpfNetworkR
 	}
 
 	var networkRule bpfNetworkRule
+
+	networkRule.Mode = mode
 
 	if cidr != "" {
 		networkRule.Flags |= CidrMatch
@@ -768,18 +772,28 @@ func (enforcer *BpfEnforcer) ReadFromAuditEventRingBuf() error {
 		}
 
 		if event.Mode == AuditMode {
-			fmt.Println("PID: ", event.Tgid)
-			fmt.Println("Ktime: ", event.Ktime)
-			fmt.Println("Mount Namespace: ", event.MntNs)
+			fmt.Println("PID:", event.Tgid)
+			fmt.Println("Ktime:", event.Ktime)
+			fmt.Println("Mount Namespace ID:", event.MntNs)
 			switch event.Type {
 			case FileType:
 				fmt.Printf("Permissions: 0x%x\n", event.Path.Permissions)
-				fmt.Printf("Path: %s\n", unix.ByteSliceToString(event.Path.Path[:]))
+				fmt.Println("Path:", unix.ByteSliceToString(event.Path.Path[:]))
 			case BprmType:
 				fmt.Printf("Permissions: 0x%x\n", event.Path.Permissions)
-				fmt.Printf("Path: %s\n", unix.ByteSliceToString(event.Path.Path[:]))
+				fmt.Println("Path:", unix.ByteSliceToString(event.Path.Path[:]))
 			case CapabilityType:
 				fmt.Printf("Capability: 0x%x\n", event.Capability)
+			case NetworkType:
+				fmt.Printf("Egress SockType: 0x%x\n", event.Egress.SockType)
+				if event.Egress.SaFamily == unix.AF_INET {
+					ip := net.IPv4(byte(event.Egress.SinAddr), byte(event.Egress.SinAddr>>8), byte(event.Egress.SinAddr>>16), byte(event.Egress.SinAddr>>24))
+					fmt.Println("Egress IPv4 address:", ip.String())
+				} else {
+					ip := net.IP(event.Egress.Sin6Addr[:])
+					fmt.Println("Egress IPv6 address:", ip.String())
+				}
+				fmt.Println("Egress Port:", event.Egress.Port)
 			}
 		}
 	}

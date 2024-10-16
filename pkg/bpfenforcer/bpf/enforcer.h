@@ -63,7 +63,7 @@
 #define FILE_TYPE       0x00000001
 #define BPRM_TYPE       0x00000002
 #define CAPABILITY_TYPE 0x00000004
-
+#define NETWORK_TYPE    0x00000008
 /*
   We use the buffer to cache file path and file name etc.
   |---------------------------------------|---------------------------------------|---------------------------------------|
@@ -94,6 +94,14 @@ struct v_path {
   unsigned char path[PATH_MAX];
 };
 
+struct v_network {
+  u32 sa_family;
+  u32 sock_type;
+  unsigned char sin6_addr[16];
+  u32 sin_addr;
+  u32 port;
+};
+
 struct audit_event {
   u32 mode;
   u32 type;
@@ -103,6 +111,7 @@ struct audit_event {
   u64 capability;
   struct v_path path;
   struct v_path path2;
+  struct v_network egress;
 };
 
 const struct audit_event *unused __attribute__((unused));

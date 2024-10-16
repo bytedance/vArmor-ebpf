@@ -290,7 +290,7 @@ int BPF_PROG(varmor_socket_connect, struct socket *sock, struct sockaddr *addres
   DEBUG_PRINT("socket flags: 0x%x", sock->flags);
 
   // Iterate all rules in the inner map
-  return iterate_net_inner_map(vnet_inner, address);
+  return iterate_net_inner_map(vnet_inner, address, sock->type, mnt_ns);
 }
 
 SEC("lsm/ptrace_access_check")
