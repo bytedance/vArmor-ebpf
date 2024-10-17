@@ -42,7 +42,7 @@ static struct net_rule *get_net_rule(u32 *vnet_inner, u32 rule_id) {
   return bpf_map_lookup_elem(vnet_inner, &rule_id);
 }
 
-static __noinline int iterate_net_inner_map(u32 *vnet_inner, struct sockaddr *address, short int sock_type, u32 mnt_ns) {
+static __noinline int iterate_net_inner_map(u32 *vnet_inner, struct sockaddr *address, u32 mnt_ns) {
   u32 inner_id, ip, i;
   bool match;
 
@@ -102,7 +102,6 @@ static __noinline int iterate_net_inner_map(u32 *vnet_inner, struct sockaddr *ad
             e->tgid = bpf_get_current_pid_tgid()>>32;
             e->ktime = bpf_ktime_get_boot_ns();
             e->egress.sa_family = AF_INET;
-            e->egress.sock_type = sock_type;
             e->egress.sin_addr = addr4->sin_addr.s_addr;
             e->egress.port = bpf_ntohs(addr4->sin_port);
             bpf_ringbuf_submit(e, 0);
@@ -142,7 +141,7 @@ static __noinline int iterate_net_inner_map(u32 *vnet_inner, struct sockaddr *ad
       if (match && (rule->flags & PORT_MATCH) && (rule->port != bpf_ntohs(addr6->sin6_port))) {
         match = false;
       }
-      
+
       if (match) {
         DEBUG_PRINT("");
         DEBUG_PRINT("access denied");
@@ -159,7 +158,6 @@ static __noinline int iterate_net_inner_map(u32 *vnet_inner, struct sockaddr *ad
             e->tgid = bpf_get_current_pid_tgid()>>32;
             e->ktime = bpf_ktime_get_boot_ns();
             e->egress.sa_family = AF_INET6;
-            e->egress.sock_type = sock_type;
             bpf_probe_read_kernel(e->egress.sin6_addr, 16, &ip6addr.in6_u.u6_addr8);
             e->egress.port = bpf_ntohs(addr6->sin6_port);
             bpf_ringbuf_submit(e, 0);

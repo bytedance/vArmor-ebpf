@@ -96,9 +96,8 @@ struct v_path {
 
 struct v_network {
   u32 sa_family;
-  u32 sock_type;
-  unsigned char sin6_addr[16];
   u32 sin_addr;
+  unsigned char sin6_addr[16];
   u32 port;
 };
 

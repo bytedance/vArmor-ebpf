@@ -29,11 +29,11 @@ type bpfAuditEvent struct {
 	}
 	Egress struct {
 		SaFamily uint32
-		SockType uint32
-		Sin6Addr [16]uint8
 		SinAddr  uint32
+		Sin6Addr [16]uint8
 		Port     uint32
 	}
+	_ [4]byte
 }
 
 type bpfBuffer struct{ Value [12288]uint8 }

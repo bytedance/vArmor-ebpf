@@ -785,7 +785,6 @@ func (enforcer *BpfEnforcer) ReadFromAuditEventRingBuf() error {
 			case CapabilityType:
 				fmt.Printf("Capability: 0x%x\n", event.Capability)
 			case NetworkType:
-				fmt.Printf("Egress SockType: 0x%x\n", event.Egress.SockType)
 				if event.Egress.SaFamily == unix.AF_INET {
 					ip := net.IPv4(byte(event.Egress.SinAddr), byte(event.Egress.SinAddr>>8), byte(event.Egress.SinAddr>>16), byte(event.Egress.SinAddr>>24))
 					fmt.Println("Egress IPv4 address:", ip.String())
