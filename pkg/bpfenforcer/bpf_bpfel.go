@@ -33,7 +33,11 @@ type bpfAuditEvent struct {
 		Sin6Addr [16]uint8
 		Port     uint32
 	}
-	_ [4]byte
+	Mount struct {
+		DevName [4096]uint8
+		Type    [16]uint8
+		Flags   uint32
+	}
 }
 
 type bpfBuffer struct{ Value [12288]uint8 }

@@ -67,7 +67,7 @@ const (
 
 	// MountRuleSize is the size of `struct mount_rule` in BPF code, it's
 	// also the value size of the inner map for mount access control.
-	MountRuleSize = 4*2 + MaxFileSystemTypeLength + PathPatternSize
+	MountRuleSize = 4*3 + MaxFileSystemTypeLength + PathPatternSize
 
 	// BPF enforcer running mode.
 	EnforceMode  = 0x00000001
@@ -100,6 +100,7 @@ const (
 	BprmType       = 0x00000002
 	CapabilityType = 0x00000004
 	NetworkType    = 0x00000008
+	MountType      = 0x00000010
 )
 
 type bpfPathRule struct {
@@ -119,12 +120,13 @@ type bpfNetworkRule struct {
 }
 
 type bpfMountRule struct {
+	Mode              uint32
 	MountFlags        uint32
 	ReverseMountFlags uint32
-	FsType            [MaxFileSystemTypeLength]byte
 	Flags             uint32
 	Prefix            [MaxFilePathPatternLength]byte
 	Suffix            [MaxFilePathPatternLength]byte
+	FsType            [MaxFileSystemTypeLength]byte
 }
 
 type BpfEnforcer struct {
@@ -636,7 +638,7 @@ func (enforcer *BpfEnforcer) ClearPtraceMap(mntNsID uint32) error {
 	return enforcer.objs.V_ptrace.Delete(&mntNsID)
 }
 
-func newBpfMountRule(sourcePattern string, fstype string, mountFlags uint32, reverseMountFlags uint32) (*bpfMountRule, error) {
+func newBpfMountRule(mode uint32, sourcePattern string, fstype string, mountFlags uint32, reverseMountFlags uint32) (*bpfMountRule, error) {
 	// Pre-check
 	if len(fstype) >= MaxFileSystemTypeLength {
 		return nil, fmt.Errorf("the length of fstype '%s' should be less than the maximum (%d)", fstype, MaxFileSystemTypeLength)
@@ -658,6 +660,8 @@ func newBpfMountRule(sourcePattern string, fstype string, mountFlags uint32, rev
 
 	var mountRule bpfMountRule
 	var flags uint32
+
+	mountRule.Mode = mode
 
 	if starWildcardLen > 0 {
 		if strings.Contains(sourcePattern, "/") {
@@ -793,6 +797,10 @@ func (enforcer *BpfEnforcer) ReadFromAuditEventRingBuf() error {
 					fmt.Println("Egress IPv6 address:", ip.String())
 				}
 				fmt.Println("Egress Port:", event.Egress.Port)
+			case MountType:
+				fmt.Println("Device Name:", unix.ByteSliceToString(event.Mount.DevName[:]))
+				fmt.Println("FileSystem Type:", unix.ByteSliceToString(event.Mount.Type[:]))
+				fmt.Println("Flags:", event.Mount.Flags)
 			}
 		}
 	}

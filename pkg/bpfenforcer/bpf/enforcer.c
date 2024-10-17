@@ -361,7 +361,7 @@ int BPF_PROG(varmor_mount, char *dev_name, struct path *path, char *type, unsign
   }
 
   // Iterate all rules in the inner map
-  return iterate_mount_inner_map(vmount_inner, flags, buf, &offset);
+  return iterate_mount_inner_map(vmount_inner, flags, buf, &offset, mnt_ns);
 }
 
 SEC("lsm/move_mount")
