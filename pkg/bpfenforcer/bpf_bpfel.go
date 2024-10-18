@@ -33,6 +33,11 @@ type bpfAuditEvent struct {
 		Sin6Addr [16]uint8
 		Port     uint32
 	}
+	Ptrace struct {
+		Permissions uint32
+		External    bool
+		_           [3]byte
+	}
 	Mount struct {
 		DevName [4096]uint8
 		Type    [16]uint8
@@ -46,6 +51,12 @@ type bpfCapabilityRule struct {
 	Mode    uint32
 	Padding uint32
 	Caps    uint64
+}
+
+type bpfPtraceRule struct {
+	Mode        uint32
+	Permissions uint32
+	Flags       uint32
 }
 
 // loadBpf returns the embedded CollectionSpec for bpf.

@@ -410,8 +410,11 @@ func Test_VarmorPtraceAccessCheck(t *testing.T) {
 	assert.NilError(t, err)
 	defer tracer.StopEnforcing()
 
-	rule := newBpfPtraceRule(AaMayBeRead, GreedyMatch)
-	tracer.SetPtraceMap(4026533400, rule)
+	rule, _ := newBpfPtraceRule(AuditMode, AaMayBeRead, GreedyMatch)
+	err = tracer.SetPtraceMap(4026532792, rule)
+	assert.NilError(t, err)
+
+	go tracer.ReadFromAuditEventRingBuf()
 
 	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C

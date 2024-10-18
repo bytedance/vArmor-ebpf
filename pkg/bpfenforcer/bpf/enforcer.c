@@ -299,22 +299,56 @@ int BPF_PROG(varmor_ptrace_access_check, struct task_struct *child, unsigned int
   struct task_struct *current = (struct task_struct *)bpf_get_current_task();
   u32 current_mnt_ns = get_task_mnt_ns_id(current);
   u32 child_mnt_ns = get_task_mnt_ns_id(child);
-  
-  // Whether the current task has ptrace access control rule
-  u64 *rule = get_ptrace_rule(current_mnt_ns);
+
+  // Check whether the current task has a ptrace rule and is allowed to trace or read a child task
+  struct ptrace_rule *rule = get_ptrace_rule(current_mnt_ns);
   if (rule != 0) {
     DEBUG_PRINT("================ lsm/ptrace_access_check ================");
-    if (!ptrace_permission_check(current_mnt_ns, child_mnt_ns, *rule, (mode & PTRACE_MODE_READ) ? AA_PTRACE_READ : AA_PTRACE_TRACE))
+    if (!ptrace_permission_check(current_mnt_ns, child_mnt_ns, rule, (mode & PTRACE_MODE_READ) ? AA_PTRACE_READ : AA_PTRACE_TRACE)) {
+      // Submit the audit event
+      if (rule->mode & AUDIT_MODE) {
+        struct audit_event *e;
+        e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
+        if (e) {
+          DEBUG_PRINT("write audit event to ringbuf");
+          e->mode = AUDIT_MODE;
+          e->type = PTRACE_TYPE;
+          e->mnt_ns = current_mnt_ns;
+          e->tgid = bpf_get_current_pid_tgid()>>32;
+          e->ktime = bpf_ktime_get_boot_ns();
+          e->ptrace.permissions = (mode & PTRACE_MODE_READ) ? AA_PTRACE_READ : AA_PTRACE_TRACE;
+          e->ptrace.external = (current_mnt_ns != child_mnt_ns);
+          bpf_ringbuf_submit(e, 0);
+        }
+      }
       return -EPERM;
+    }
   }
 
-  // Whether the child task has ptrace access control rule
-  // We allow tasks from the init mnt ns by default
+  // Check whether the child task has a ptrace rule and is allowed to be traced or read by the current task
+  // We allow tasks in the init mnt ns by default
   rule = get_ptrace_rule(child_mnt_ns);
   if (current_mnt_ns != init_mnt_ns && rule != 0) {
     DEBUG_PRINT("================ lsm/ptrace_access_check ================");
-    if (!ptrace_permission_check(current_mnt_ns, child_mnt_ns, *rule, (mode & PTRACE_MODE_READ) ? AA_MAY_BE_READ : AA_MAY_BE_TRACED))
+    if (!ptrace_permission_check(current_mnt_ns, child_mnt_ns, rule, (mode & PTRACE_MODE_READ) ? AA_MAY_BE_READ : AA_MAY_BE_TRACED)) {
+      // Submit the audit event
+      if (rule->mode & AUDIT_MODE) {
+        struct audit_event *e;
+        e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
+        if (e) {
+          DEBUG_PRINT("write audit event to ringbuf");
+          e->mode = AUDIT_MODE;
+          e->type = PTRACE_TYPE;
+          e->mnt_ns = child_mnt_ns;
+          e->tgid = bpf_get_current_pid_tgid()>>32;
+          e->ktime = bpf_ktime_get_boot_ns();
+          e->ptrace.permissions = (mode & PTRACE_MODE_READ) ? AA_MAY_BE_READ : AA_MAY_BE_TRACED;
+          e->ptrace.external = (current_mnt_ns != child_mnt_ns);
+          bpf_ringbuf_submit(e, 0);
+        }
+      }
       return -EPERM;
+    }
   }
 
   return 0;

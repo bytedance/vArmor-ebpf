@@ -100,7 +100,8 @@ const (
 	BprmType       = 0x00000002
 	CapabilityType = 0x00000004
 	NetworkType    = 0x00000008
-	MountType      = 0x00000010
+	PtraceType     = 0x00000010
+	MountType      = 0x00000020
 )
 
 type bpfPathRule struct {
@@ -626,12 +627,16 @@ func (enforcer *BpfEnforcer) ClearNetMap(mntNsID uint32) error {
 	return enforcer.objs.V_netOuter.Delete(&mntNsID)
 }
 
-func newBpfPtraceRule(permissions uint32, flags uint32) uint64 {
-	return uint64(permissions)<<32 + uint64(flags)
+func newBpfPtraceRule(mode uint32, permissions uint32, flags uint32) (*bpfPtraceRule, error) {
+	var ptraceRule bpfPtraceRule
+	ptraceRule.Mode = mode
+	ptraceRule.Permissions = permissions
+	ptraceRule.Flags = flags
+	return &ptraceRule, nil
 }
 
-func (enforcer *BpfEnforcer) SetPtraceMap(mntNsID uint32, ptraceRule uint64) error {
-	return enforcer.objs.V_ptrace.Put(&mntNsID, &ptraceRule)
+func (enforcer *BpfEnforcer) SetPtraceMap(mntNsID uint32, ptraceRule *bpfPtraceRule) error {
+	return enforcer.objs.V_ptrace.Put(&mntNsID, ptraceRule)
 }
 
 func (enforcer *BpfEnforcer) ClearPtraceMap(mntNsID uint32) error {
@@ -797,6 +802,9 @@ func (enforcer *BpfEnforcer) ReadFromAuditEventRingBuf() error {
 					fmt.Println("Egress IPv6 address:", ip.String())
 				}
 				fmt.Println("Egress Port:", event.Egress.Port)
+			case PtraceType:
+				fmt.Println("Permissions:", event.Ptrace.Permissions)
+				fmt.Println("Externel:", event.Ptrace.External)
 			case MountType:
 				fmt.Println("Device Name:", unix.ByteSliceToString(event.Mount.DevName[:]))
 				fmt.Println("FileSystem Type:", unix.ByteSliceToString(event.Mount.Type[:]))

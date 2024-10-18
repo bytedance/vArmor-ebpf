@@ -67,7 +67,8 @@
 #define BPRM_TYPE       0x00000002
 #define CAPABILITY_TYPE 0x00000004
 #define NETWORK_TYPE    0x00000008
-#define MOUNT_TYPE      0x00000010
+#define PTRACE_TYPE     0x00000010
+#define MOUNT_TYPE      0x00000020
 
 /*
   We use the buffer to cache file path and file name etc.
@@ -106,6 +107,11 @@ struct v_network {
   u32 port;
 };
 
+struct v_ptrace {
+  u32 permissions;
+  bool external;
+};
+
 struct v_mount {
   unsigned char dev_name[PATH_MAX];
   unsigned char type[FILE_SYSTEM_TYPE_MAX];
@@ -122,6 +128,7 @@ struct audit_event {
   struct v_path path;
   struct v_path path2;
   struct v_network egress;
+  struct v_ptrace ptrace;
   struct v_mount mount;
 };
 
