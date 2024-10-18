@@ -438,7 +438,7 @@ int BPF_PROG(varmor_move_mount, struct path *from_path, struct path *to_path) {
   DEBUG_PRINT("mock flags: 0x%x", mock_flags);
 
   // Iterate all rules in the inner map
-  return iterate_mount_inner_map_extra(vmount_inner, mock_flags, buf, &offset);
+  return iterate_mount_inner_map_extra(vmount_inner, mock_flags, buf, &offset, mnt_ns);
 }
 
 SEC("lsm/sb_umount")
@@ -480,5 +480,5 @@ int BPF_PROG(varmor_umount, struct vfsmount *mnt, int flags) {
   DEBUG_PRINT("mock flags: 0x%x", mock_flags);
 
   // Iterate all rules in the inner map
-  return iterate_mount_inner_map_extra(vmount_inner, mock_flags, buf, &offset);
+  return iterate_mount_inner_map_extra(vmount_inner, mock_flags, buf, &offset, mnt_ns);
 }

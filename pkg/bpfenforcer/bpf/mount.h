@@ -112,7 +112,7 @@ static __noinline int iterate_mount_inner_map(u32 *vmount_inner, unsigned long f
   return 0;
 }
 
-static __noinline int iterate_mount_inner_map_extra(u32 *vmount_inner, unsigned long flags, struct buffer *buf, struct buffer_offset *offset) {
+static __noinline int iterate_mount_inner_map_extra(u32 *vmount_inner, unsigned long flags, struct buffer *buf, struct buffer_offset *offset, u32 mnt_ns) {
   for (int inner_id=0; inner_id<MOUNT_INNER_MAP_ENTRIES_MAX; inner_id++) {
     // The key of the inner map must start from 0
     struct mount_rule *rule = get_mount_rule(vmount_inner, inner_id);
@@ -132,6 +132,25 @@ static __noinline int iterate_mount_inner_map_extra(u32 *vmount_inner, unsigned 
           old_path_check(&rule->pattern, buf, offset)) {
         DEBUG_PRINT("");
         DEBUG_PRINT("access denied");
+
+        // Submit the audit event
+        if (rule->mode & AUDIT_MODE) {
+          struct audit_event *e;
+          e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
+          if (e) {
+            DEBUG_PRINT("write audit event to ringbuf");
+            e->mode = AUDIT_MODE;
+            e->type = MOUNT_TYPE;
+            e->mnt_ns = mnt_ns;
+            e->tgid = bpf_get_current_pid_tgid()>>32;
+            e->ktime = bpf_ktime_get_boot_ns();
+            bpf_probe_read_kernel_str(e->mount.dev_name, (PATH_MAX-offset->first_path) & (PATH_MAX-1), &(buf->value[offset->first_path & (PATH_MAX-1)]));
+            bpf_probe_read_kernel_str(e->mount.type, FILE_SYSTEM_TYPE_MAX, &(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX]));
+            e->mount.flags = flags;
+            bpf_ringbuf_submit(e, 0);
+          }
+        }
+
         return -EPERM;
       }
     }
