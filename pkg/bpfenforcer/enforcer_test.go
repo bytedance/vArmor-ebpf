@@ -212,12 +212,6 @@ func Test_VarmorFileRule(t *testing.T) {
 	err = tracer.SetFileMap(4026532792, rule)
 	assert.NilError(t, err)
 
-	rule, err = newBpfPathRule(AuditMode, "/bin/**ng", AaMayExec)
-	assert.NilError(t, err)
-
-	err = tracer.SetBprmMap(4026532792, rule)
-	assert.NilError(t, err)
-
 	go tracer.ReadFromAuditEventRingBuf()
 
 	stopTicker := time.NewTicker(5 * time.Second)
@@ -241,8 +235,10 @@ func Test_VarmorBprmCheckSecurity(t *testing.T) {
 	rule, err := newBpfPathRule(EnforceMode, "/bin/**ng", AaMayExec)
 	assert.NilError(t, err)
 
-	err = tracer.SetBprmMap(4026532844, rule)
+	err = tracer.SetBprmMap(4026532792, rule)
 	assert.NilError(t, err)
+
+	go tracer.ReadFromAuditEventRingBuf()
 
 	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C

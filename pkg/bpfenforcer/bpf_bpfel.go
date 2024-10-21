@@ -13,36 +13,12 @@ import (
 )
 
 type bpfAuditEvent struct {
-	Mode       uint32
-	Type       uint32
-	MntNs      uint32
-	Tgid       uint32
-	Ktime      uint64
-	Capability uint64
-	Path       struct {
-		Permissions uint32
-		Path        [4096]uint8
-	}
-	Path2 struct {
-		Permissions uint32
-		Path        [4096]uint8
-	}
-	Egress struct {
-		SaFamily uint32
-		SinAddr  uint32
-		Sin6Addr [16]uint8
-		Port     uint32
-	}
-	Ptrace struct {
-		Permissions uint32
-		External    bool
-		_           [3]byte
-	}
-	Mount struct {
-		DevName [4096]uint8
-		Type    [16]uint8
-		Flags   uint32
-	}
+	Mode   uint32
+	Type   uint32
+	MntNs  uint32
+	Tgid   uint32
+	Ktime  uint64
+	EventU struct{ Buffer [4120]uint8 }
 }
 
 type bpfBuffer struct{ Value [12288]uint8 }

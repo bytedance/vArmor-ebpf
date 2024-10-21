@@ -101,9 +101,9 @@ static __noinline int iterate_net_inner_map(u32 *vnet_inner, struct sockaddr *ad
             e->mnt_ns = mnt_ns;
             e->tgid = bpf_get_current_pid_tgid()>>32;
             e->ktime = bpf_ktime_get_boot_ns();
-            e->egress.sa_family = AF_INET;
-            e->egress.sin_addr = addr4->sin_addr.s_addr;
-            e->egress.port = bpf_ntohs(addr4->sin_port);
+            e->event_u.egress.sa_family = AF_INET;
+            e->event_u.egress.sin_addr = addr4->sin_addr.s_addr;
+            e->event_u.egress.port = bpf_ntohs(addr4->sin_port);
             bpf_ringbuf_submit(e, 0);
           }
         }
@@ -157,9 +157,9 @@ static __noinline int iterate_net_inner_map(u32 *vnet_inner, struct sockaddr *ad
             e->mnt_ns = mnt_ns;
             e->tgid = bpf_get_current_pid_tgid()>>32;
             e->ktime = bpf_ktime_get_boot_ns();
-            e->egress.sa_family = AF_INET6;
-            bpf_probe_read_kernel(e->egress.sin6_addr, 16, &ip6addr.in6_u.u6_addr8);
-            e->egress.port = bpf_ntohs(addr6->sin6_port);
+            e->event_u.egress.sa_family = AF_INET6;
+            bpf_probe_read_kernel(e->event_u.egress.sin6_addr, 16, &ip6addr.in6_u.u6_addr8);
+            e->event_u.egress.port = bpf_ntohs(addr6->sin6_port);
             bpf_ringbuf_submit(e, 0);
           }
         }

@@ -58,8 +58,8 @@ static __noinline int iterate_bprm_inner_map_for_executable(u32 *vbprm_inner, st
           e->mnt_ns = mnt_ns;
           e->tgid = bpf_get_current_pid_tgid()>>32;
           e->ktime = bpf_ktime_get_boot_ns();
-          e->path.permissions = AA_MAY_EXEC;
-          bpf_probe_read_kernel_str(&e->path.path, offset->first_path-1 & (PATH_MAX-1), &buf->value);
+          e->event_u.path.permissions = AA_MAY_EXEC;
+          bpf_probe_read_kernel_str(&e->event_u.path.path, offset->first_path & (PATH_MAX-1), &buf->value);
           bpf_ringbuf_submit(e, 0);
         }
       }

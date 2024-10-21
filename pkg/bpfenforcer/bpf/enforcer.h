@@ -63,9 +63,9 @@
 #define PORT_MATCH    0x00000100
 
 // Event type
-#define FILE_TYPE       0x00000001
-#define BPRM_TYPE       0x00000002
-#define CAPABILITY_TYPE 0x00000004
+#define CAPABILITY_TYPE 0x00000001
+#define FILE_TYPE       0x00000002
+#define BPRM_TYPE       0x00000004
 #define NETWORK_TYPE    0x00000008
 #define PTRACE_TYPE     0x00000010
 #define MOUNT_TYPE      0x00000020
@@ -124,12 +124,14 @@ struct audit_event {
   u32 mnt_ns;
   u32 tgid;
   u64 ktime;
-  u64 capability;
-  struct v_path path;
-  struct v_path path2;
-  struct v_network egress;
-  struct v_ptrace ptrace;
-  struct v_mount mount;
+  union {
+    unsigned char buffer[4120];
+    u64 capability;
+    struct v_path path;
+    struct v_network egress;
+    struct v_ptrace ptrace;
+    struct v_mount mount;
+  } event_u;
 };
 
 const struct audit_event *unused __attribute__((unused));

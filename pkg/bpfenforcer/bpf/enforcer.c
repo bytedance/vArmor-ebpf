@@ -82,7 +82,7 @@ int BPF_PROG(varmor_capable, const struct cred *cred, struct user_namespace *ns,
         e->mnt_ns = mnt_ns;
         e->tgid = bpf_get_current_pid_tgid()>>32;
         e->ktime = bpf_ktime_get_boot_ns();
-        e->capability = cap;
+        e->event_u.capability = cap;
         bpf_ringbuf_submit(e, 0);
       }
     }
@@ -316,8 +316,8 @@ int BPF_PROG(varmor_ptrace_access_check, struct task_struct *child, unsigned int
           e->mnt_ns = current_mnt_ns;
           e->tgid = bpf_get_current_pid_tgid()>>32;
           e->ktime = bpf_ktime_get_boot_ns();
-          e->ptrace.permissions = (mode & PTRACE_MODE_READ) ? AA_PTRACE_READ : AA_PTRACE_TRACE;
-          e->ptrace.external = (current_mnt_ns != child_mnt_ns);
+          e->event_u.ptrace.permissions = (mode & PTRACE_MODE_READ) ? AA_PTRACE_READ : AA_PTRACE_TRACE;
+          e->event_u.ptrace.external = (current_mnt_ns != child_mnt_ns);
           bpf_ringbuf_submit(e, 0);
         }
       }
@@ -342,8 +342,8 @@ int BPF_PROG(varmor_ptrace_access_check, struct task_struct *child, unsigned int
           e->mnt_ns = child_mnt_ns;
           e->tgid = bpf_get_current_pid_tgid()>>32;
           e->ktime = bpf_ktime_get_boot_ns();
-          e->ptrace.permissions = (mode & PTRACE_MODE_READ) ? AA_MAY_BE_READ : AA_MAY_BE_TRACED;
-          e->ptrace.external = (current_mnt_ns != child_mnt_ns);
+          e->event_u.ptrace.permissions = (mode & PTRACE_MODE_READ) ? AA_MAY_BE_READ : AA_MAY_BE_TRACED;
+          e->event_u.ptrace.external = (current_mnt_ns != child_mnt_ns);
           bpf_ringbuf_submit(e, 0);
         }
       }

@@ -95,9 +95,9 @@ static __noinline int iterate_mount_inner_map(u32 *vmount_inner, unsigned long f
             e->mnt_ns = mnt_ns;
             e->tgid = bpf_get_current_pid_tgid()>>32;
             e->ktime = bpf_ktime_get_boot_ns();
-            bpf_probe_read_kernel_str(e->mount.dev_name, offset->first_path & (PATH_MAX-1), buf->value);
-            bpf_probe_read_kernel_str(e->mount.type, FILE_SYSTEM_TYPE_MAX, &(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX]));
-            e->mount.flags = flags;
+            bpf_probe_read_kernel_str(e->event_u.mount.dev_name, offset->first_path & (PATH_MAX-1), buf->value);
+            bpf_probe_read_kernel_str(e->event_u.mount.type, FILE_SYSTEM_TYPE_MAX, &(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX]));
+            e->event_u.mount.flags = flags;
             bpf_ringbuf_submit(e, 0);
           }
         }
@@ -144,9 +144,9 @@ static __noinline int iterate_mount_inner_map_extra(u32 *vmount_inner, unsigned 
             e->mnt_ns = mnt_ns;
             e->tgid = bpf_get_current_pid_tgid()>>32;
             e->ktime = bpf_ktime_get_boot_ns();
-            bpf_probe_read_kernel_str(e->mount.dev_name, (PATH_MAX-offset->first_path) & (PATH_MAX-1), &(buf->value[offset->first_path & (PATH_MAX-1)]));
-            bpf_probe_read_kernel_str(e->mount.type, FILE_SYSTEM_TYPE_MAX, &(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX]));
-            e->mount.flags = flags;
+            bpf_probe_read_kernel_str(e->event_u.mount.dev_name, (PATH_MAX-offset->first_path) & (PATH_MAX-1), &(buf->value[offset->first_path & (PATH_MAX-1)]));
+            bpf_probe_read_kernel_str(e->event_u.mount.type, FILE_SYSTEM_TYPE_MAX, &(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX]));
+            e->event_u.mount.flags = flags;
             bpf_ringbuf_submit(e, 0);
           }
         }

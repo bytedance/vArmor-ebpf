@@ -97,8 +97,8 @@ static __always_inline int iterate_file_inner_map_for_file(u32 *vfile_inner, str
             e->mnt_ns = mnt_ns;
             e->tgid = bpf_get_current_pid_tgid()>>32;
             e->ktime = bpf_ktime_get_boot_ns();
-            e->path.permissions = requested_perms;
-            bpf_probe_read_kernel_str(&e->path.path, PATH_MAX-offset->first_path & (PATH_MAX-1), &(buf->value[offset->first_path & (PATH_MAX-1)]));
+            e->event_u.path.permissions = requested_perms;
+            bpf_probe_read_kernel_str(&e->event_u.path.path, PATH_MAX-offset->first_path & (PATH_MAX-1), &(buf->value[offset->first_path & (PATH_MAX-1)]));
             bpf_ringbuf_submit(e, 0);
           }
         }
@@ -142,8 +142,8 @@ static __noinline int iterate_file_inner_map_for_path_pair(u32 *vfile_inner, str
             e->mnt_ns = mnt_ns;
             e->tgid = bpf_get_current_pid_tgid()>>32;
             e->ktime = bpf_ktime_get_boot_ns();
-            e->path.permissions = AA_MAY_READ;
-            bpf_probe_read_kernel_str(&e->path.path, PATH_MAX-offset->first_path & (PATH_MAX-1), &(buf->value[offset->first_path & (PATH_MAX-1)]));
+            e->event_u.path.permissions = AA_MAY_READ;
+            bpf_probe_read_kernel_str(&e->event_u.path.path, PATH_MAX-offset->first_path & (PATH_MAX-1), &(buf->value[offset->first_path & (PATH_MAX-1)]));
             bpf_ringbuf_submit(e, 0);
           }
         }
@@ -167,8 +167,8 @@ static __noinline int iterate_file_inner_map_for_path_pair(u32 *vfile_inner, str
             e->mnt_ns = mnt_ns;
             e->tgid = bpf_get_current_pid_tgid()>>32;
             e->ktime = bpf_ktime_get_boot_ns();
-            e->path.permissions = AA_MAY_WRITE;
-            bpf_probe_read_kernel_str(&e->path.path, PATH_MAX*2-offset->second_path & (PATH_MAX-1), &(buf->value[offset->second_path & (PATH_MAX*2-1)]));
+            e->event_u.path.permissions = AA_MAY_WRITE;
+            bpf_probe_read_kernel_str(&e->event_u.path.path, PATH_MAX*2-offset->second_path & (PATH_MAX-1), &(buf->value[offset->second_path & (PATH_MAX*2-1)]));
             bpf_ringbuf_submit(e, 0);
           }
         }
