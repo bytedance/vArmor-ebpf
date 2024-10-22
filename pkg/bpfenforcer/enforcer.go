@@ -106,6 +106,12 @@ const (
 
 	// EventHeaderSize is the size of bpf audit event header
 	EventHeaderSize = 24
+
+	// PinPath is the path we want to pin the maps
+	PinPath = "/sys/fs/bpf/varmor"
+
+	// AuditRingBufPinPath is the path we pin the audit ringbuf
+	AuditRingBufPinPath = "/sys/fs/bpf/varmor/v_audit_rb"
 )
 
 // Audit Event
@@ -279,9 +285,17 @@ func (enforcer *BpfEnforcer) InitEBPF() error {
 		"init_mnt_ns": initMntNsId,
 	})
 
+	if err := os.MkdirAll(PinPath, os.ModePerm); err != nil {
+		return fmt.Errorf("failed to create bpf fs subpath: %+v", err)
+	}
+
 	// Load pre-compiled programs and maps into the kernel.
 	enforcer.log.Info("load ebpf program and maps into the kernel")
-	err = collectionSpec.LoadAndAssign(&enforcer.objs, nil)
+	err = collectionSpec.LoadAndAssign(&enforcer.objs, &ebpf.CollectionOptions{
+		Maps: ebpf.MapOptions{
+			PinPath: PinPath,
+		},
+	})
 	if err != nil {
 		return err
 	}
@@ -296,6 +310,9 @@ func (enforcer *BpfEnforcer) InitEBPF() error {
 }
 
 func (enforcer *BpfEnforcer) RemoveEBPF() error {
+	enforcer.log.Info("unping ebpf map")
+	enforcer.objs.V_auditRb.Unpin()
+	os.RemoveAll(PinPath)
 	enforcer.log.Info("unload ebpf program")
 	return enforcer.objs.Close()
 }
@@ -801,8 +818,8 @@ func (enforcer *BpfEnforcer) ClearMountMap(mntNsID uint32) error {
 	return enforcer.objs.V_mountOuter.Delete(&mntNsID)
 }
 
-func (enforcer *BpfEnforcer) ReadFromAuditEventRingBuf() error {
-	rd, err := ringbuf.NewReader(enforcer.objs.V_auditRb)
+func (enforcer *BpfEnforcer) ReadFromAuditEventRingBuf(ringbufMap *ebpf.Map) error {
+	rd, err := ringbuf.NewReader(ringbufMap)
 	if err != nil {
 		return err
 	}
@@ -908,4 +925,13 @@ func (enforcer *BpfEnforcer) ReadFromAuditEventRingBuf() error {
 	}
 
 	return nil
+}
+
+func (enforcer *BpfEnforcer) LoadMap() (ringbufMap *ebpf.Map, err error) {
+	m, err := ebpf.LoadPinnedMap(AuditRingBufPinPath, nil)
+	if err != nil {
+		fmt.Println("LoadPinnedMap()", err)
+		return nil, err
+	}
+	return m, nil
 }

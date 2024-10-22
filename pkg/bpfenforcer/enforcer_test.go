@@ -69,7 +69,7 @@ func Test_VarmorCapable(t *testing.T) {
 
 	fmt.Println("deny tasks(mnt ns id: 4026532792) to use CAP_NET_RAW | CAP_SYS_ADMIN")
 
-	go tracer.ReadFromAuditEventRingBuf()
+	go tracer.ReadFromAuditEventRingBuf(tracer.objs.V_auditRb)
 
 	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
@@ -212,7 +212,7 @@ func Test_VarmorFileRule(t *testing.T) {
 	err = tracer.SetFileMap(4026532792, rule)
 	assert.NilError(t, err)
 
-	go tracer.ReadFromAuditEventRingBuf()
+	go tracer.ReadFromAuditEventRingBuf(tracer.objs.V_auditRb)
 
 	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
@@ -232,13 +232,16 @@ func Test_VarmorBprmCheckSecurity(t *testing.T) {
 	assert.NilError(t, err)
 	defer tracer.StopEnforcing()
 
-	rule, err := newBpfPathRule(EnforceMode, "/bin/**ng", AaMayExec)
+	rule, err := newBpfPathRule(AuditMode, "/bin/**ng", AaMayExec)
 	assert.NilError(t, err)
 
 	err = tracer.SetBprmMap(4026532792, rule)
 	assert.NilError(t, err)
 
-	go tracer.ReadFromAuditEventRingBuf()
+	m, err := tracer.LoadMap()
+	assert.NilError(t, err)
+
+	go tracer.ReadFromAuditEventRingBuf(m)
 
 	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
@@ -386,7 +389,7 @@ func Test_VarmorNetCheckSecurity(t *testing.T) {
 	err = tracer.SetNetMap(4026532792, rule)
 	assert.NilError(t, err)
 
-	go tracer.ReadFromAuditEventRingBuf()
+	go tracer.ReadFromAuditEventRingBuf(tracer.objs.V_auditRb)
 
 	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
@@ -410,7 +413,7 @@ func Test_VarmorPtraceAccessCheck(t *testing.T) {
 	err = tracer.SetPtraceMap(4026532792, rule)
 	assert.NilError(t, err)
 
-	go tracer.ReadFromAuditEventRingBuf()
+	go tracer.ReadFromAuditEventRingBuf(tracer.objs.V_auditRb)
 
 	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
@@ -436,7 +439,7 @@ func Test_VarmorBindMountAccessCheck(t *testing.T) {
 	err = tracer.SetMountMap(4026532792, rule)
 	assert.NilError(t, err)
 
-	go tracer.ReadFromAuditEventRingBuf()
+	go tracer.ReadFromAuditEventRingBuf(tracer.objs.V_auditRb)
 
 	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
@@ -467,7 +470,7 @@ func Test_VarmorMountNewProcAccessCheck(t *testing.T) {
 	err = tracer.SetMountMap(4026532792, rule)
 	assert.NilError(t, err)
 
-	go tracer.ReadFromAuditEventRingBuf()
+	go tracer.ReadFromAuditEventRingBuf(tracer.objs.V_auditRb)
 
 	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
