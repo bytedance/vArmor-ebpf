@@ -63,16 +63,19 @@ func Test_VarmorCapable(t *testing.T) {
 
 	// CAP_SYS_ADMIN: unshare -Urn
 	// CAP_NET_RAW: ping 127.0.0.1
-	err = tracer.SetCapableMap(4026533394, 1<<unix.CAP_NET_RAW|1<<unix.CAP_SYS_ADMIN)
+	capRule, _ := newBpfCapabilityRule(AuditMode, 1<<unix.CAP_NET_RAW|1<<unix.CAP_SYS_ADMIN)
+	err = tracer.SetCapableMap(4026532792, capRule)
 	assert.NilError(t, err)
 
-	fmt.Println("deny tasks(mnt ns id: 4026533394) to use CAP_NET_RAW | CAP_SYS_ADMIN")
+	fmt.Println("deny tasks(mnt ns id: 4026532792) to use CAP_NET_RAW | CAP_SYS_ADMIN")
+
+	go tracer.ReadFromAuditEventRingBuf(tracer.objs.V_auditRb)
 
 	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
 
-	fmt.Println("allow tasks(mnt ns id: 4026533394) to use CAP_NET_RAW | CAP_SYS_ADMIN")
-	err = tracer.ClearCapableMap(4026533394)
+	fmt.Println("allow tasks(mnt ns id: 4026532792) to use CAP_NET_RAW | CAP_SYS_ADMIN")
+	err = tracer.ClearCapableMap(4026532792)
 	assert.NilError(t, err)
 
 	stopTicker = time.NewTicker(5 * time.Second)
@@ -90,94 +93,94 @@ func Test_newBpfPathRule(t *testing.T) {
 	}{
 		{
 			pattern:     "/**/devices/ta*",
-			permission:  AA_MAY_WRITE,
+			permission:  AaMayWrite,
 			expectedErr: fmt.Errorf("the globbing * and ** in the pattern '/**/devices/ta*' cannot be used at the same time"),
 		},
 		{
 			pattern:     "/dwa**/devices/*",
-			permission:  AA_MAY_WRITE,
+			permission:  AaMayWrite,
 			expectedErr: fmt.Errorf("the globbing * and ** in the pattern '/dwa**/devices/*' cannot be used at the same time"),
 		},
 		{
 			pattern:     "/**dwad/devices/*/dwa",
-			permission:  AA_MAY_WRITE,
+			permission:  AaMayWrite,
 			expectedErr: fmt.Errorf("the globbing * and ** in the pattern '/**dwad/devices/*/dwa' cannot be used at the same time"),
 		},
 		{
 			pattern:     "/dwad/d**evices/*/",
-			permission:  AA_MAY_WRITE,
+			permission:  AaMayWrite,
 			expectedErr: fmt.Errorf("the globbing * and ** in the pattern '/dwad/d**evices/*/' cannot be used at the same time"),
 		},
 		{
 			pattern:     "/dwad/*/**devices/ta*",
-			permission:  AA_MAY_WRITE,
+			permission:  AaMayWrite,
 			expectedErr: fmt.Errorf("the globbing * and ** in the pattern '/dwad/*/**devices/ta*' cannot be used at the same time"),
 		},
 		{
 			pattern:     "/**/devices/**/tasks",
-			permission:  AA_MAY_WRITE,
+			permission:  AaMayWrite,
 			expectedErr: fmt.Errorf("the globbing * or ** in the pattern '/**/devices/**/tasks' can only be used once"),
 		},
 		{
 			pattern:     "/devices**/**/tasks",
-			permission:  AA_MAY_WRITE,
+			permission:  AaMayWrite,
 			expectedErr: fmt.Errorf("the globbing * or ** in the pattern '/devices**/**/tasks' can only be used once"),
 		},
 		{
 			pattern:     "/*/devices/tda*",
-			permission:  AA_MAY_WRITE,
+			permission:  AaMayWrite,
 			expectedErr: fmt.Errorf("the globbing * or ** in the pattern '/*/devices/tda*' can only be used once"),
 		},
 		{
 			pattern:     "/*/*",
-			permission:  AA_MAY_WRITE,
+			permission:  AaMayWrite,
 			expectedErr: fmt.Errorf("the globbing * or ** in the pattern '/*/*' can only be used once"),
 		},
 		{
 			pattern:     "/*devices/ta*",
-			permission:  AA_MAY_WRITE,
+			permission:  AaMayWrite,
 			expectedErr: fmt.Errorf("the globbing * or ** in the pattern '/*devices/ta*' can only be used once"),
 		},
 		{
 			pattern:     "/devices/*ta",
-			permission:  AA_MAY_WRITE,
+			permission:  AaMayWrite,
 			expectedErr: fmt.Errorf("the pattern '/devices/*ta' with globbing * is not supported"),
 		},
 		{
 			pattern:     "/etc/*",
-			permission:  AA_MAY_WRITE,
+			permission:  AaMayWrite,
 			expectedErr: fmt.Errorf("the pattern '/etc/*' with globbing * is not supported"),
 		},
 		{
 			pattern:     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*xx",
-			permission:  AA_MAY_WRITE,
-			expectedErr: fmt.Errorf("the length of prefix 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' should be less than the maximum (%d)", FILE_PATH_PATTERN_SIZE_MAX),
+			permission:  AaMayWrite,
+			expectedErr: fmt.Errorf("the length of prefix 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' should be less than the maximum (%d)", MaxFilePathPatternLength),
 		},
 		{
 			pattern:     "x*xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-			permission:  AA_MAY_WRITE,
-			expectedErr: fmt.Errorf("the length of suffix 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' should be less than the maximum (%d)", FILE_PATH_PATTERN_SIZE_MAX),
+			permission:  AaMayWrite,
+			expectedErr: fmt.Errorf("the length of suffix 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' should be less than the maximum (%d)", MaxFilePathPatternLength),
 		},
 		{
 			pattern:     "/**/devices/ta",
-			permission:  AA_MAY_WRITE,
+			permission:  AaMayWrite,
 			expectedErr: nil,
 		},
 		{
 			pattern:     "passwd*",
-			permission:  AA_MAY_WRITE,
+			permission:  AaMayWrite,
 			expectedErr: nil,
 		},
 		{
 			pattern:     "*.log",
-			permission:  AA_MAY_WRITE,
+			permission:  AaMayWrite,
 			expectedErr: nil,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.pattern, func(t *testing.T) {
-			rule, err := newBpfPathRule(tc.pattern, tc.permission)
+			rule, err := newBpfPathRule(EnforceMode, tc.pattern, tc.permission)
 			if err != nil {
 				assert.Equal(t, err.Error(), tc.expectedErr.Error())
 			} else {
@@ -203,11 +206,13 @@ func Test_VarmorFileRule(t *testing.T) {
 
 	// host mnt ns id: 4026531840
 	// match /tmp/33**, /**/33, /tmp/**/33, /etc/**,
-	rule, err := newBpfPathRule("/**/hostname", AA_MAY_WRITE|AA_MAY_APPEND)
+	rule, err := newBpfPathRule(AuditMode, "/**/hostname", AaMayWrite|AaMayAppend)
 	assert.NilError(t, err)
 
-	err = tracer.SetFileMap(4026531840, rule)
+	err = tracer.SetFileMap(4026532792, rule)
 	assert.NilError(t, err)
+
+	go tracer.ReadFromAuditEventRingBuf(tracer.objs.V_auditRb)
 
 	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
@@ -227,11 +232,16 @@ func Test_VarmorBprmCheckSecurity(t *testing.T) {
 	assert.NilError(t, err)
 	defer tracer.StopEnforcing()
 
-	rule, err := newBpfPathRule("/bin/**ng", AA_MAY_EXEC)
+	rule, err := newBpfPathRule(AuditMode, "/bin/**ng", AaMayExec)
 	assert.NilError(t, err)
 
-	err = tracer.SetBprmMap(4026532844, rule)
+	err = tracer.SetBprmMap(4026532792, rule)
 	assert.NilError(t, err)
+
+	m, err := tracer.LoadMap()
+	assert.NilError(t, err)
+
+	go tracer.ReadFromAuditEventRingBuf(m)
 
 	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
@@ -338,7 +348,7 @@ func Test_newBpfNetworkRule(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			rule, err := newBpfNetworkRule(tc.cidr, tc.address, tc.port)
+			rule, err := newBpfNetworkRule(AuditMode, tc.cidr, tc.address, tc.port)
 			if err != nil {
 				assert.Equal(t, err.Error(), tc.expectedErr.Error())
 			} else {
@@ -366,18 +376,20 @@ func Test_VarmorNetCheckSecurity(t *testing.T) {
 	assert.NilError(t, err)
 	defer tracer.StopEnforcing()
 
-	// rule, err := newBpfNetworkRule("", "11.30.31.68", 6443)
-	// rule, err := newBpfNetworkRule("", "fdbd:dc01:ff:307:9329:268d:3a27:2ca7", 0)
-	// rule, err := newBpfNetworkRule("", "", 10250)
+	// rule, err := newBpfNetworkRule(AuditMode, "", "11.30.31.68", 6443)
+	// rule, err := newBpfNetworkRule(AuditMode, "", "fdbd:dc01:ff:307:9329:268d:3a27:2ca7", 0)
+	// rule, err := newBpfNetworkRule(AuditMode, "", "", 10250)
 	// CIDR: 172.0.0.0/11 (172.0.0.0 ~ 172.31.255.255) test with 172.31.0.1 and 172.32.0.1
-	// rule, err := newBpfNetworkRule("172.16.0.0/11", "", 0)
+	// rule, err := newBpfNetworkRule(AuditMode, "172.16.0.0/11", "", 0)
 	// CIDR: 2001:db8::/31 (2001:db8:: ~ 2001:db9:ffff:ffff:ffff:ffff:ffff:ffff ) test with 2001:db8:1:: and 2001:dba:1::
-	// rule, err := newBpfNetworkRule("2001:db8::/31", "", 0)
-	rule, err := newBpfNetworkRule("192.168.1.0/24", "", 0)
+	// rule, err := newBpfNetworkRule(AuditMode, "2001:db8::/31", "", 0)
+	rule, err := newBpfNetworkRule(AuditMode, "192.168.1.0/24", "", 0)
 	assert.NilError(t, err)
 
-	err = tracer.SetNetMap(4026533559, rule)
+	err = tracer.SetNetMap(4026532792, rule)
 	assert.NilError(t, err)
+
+	go tracer.ReadFromAuditEventRingBuf(tracer.objs.V_auditRb)
 
 	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
@@ -397,8 +409,11 @@ func Test_VarmorPtraceAccessCheck(t *testing.T) {
 	assert.NilError(t, err)
 	defer tracer.StopEnforcing()
 
-	rule := newBpfPtraceRule(AA_MAY_BE_READ, GREEDY_MATCH)
-	tracer.SetPtraceMap(4026533400, rule)
+	rule, _ := newBpfPtraceRule(AuditMode, AaMayBeRead, GreedyMatch)
+	err = tracer.SetPtraceMap(4026532792, rule)
+	assert.NilError(t, err)
+
+	go tracer.ReadFromAuditEventRingBuf(tracer.objs.V_auditRb)
 
 	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
@@ -418,11 +433,13 @@ func Test_VarmorBindMountAccessCheck(t *testing.T) {
 	assert.NilError(t, err)
 	defer tracer.StopEnforcing()
 
-	rule, err := newBpfMountRule("/proc**", "none", unix.MS_BIND, 0)
+	rule, err := newBpfMountRule(AuditMode, "/proc**", "none", unix.MS_BIND, 0)
 	assert.NilError(t, err)
 
-	err = tracer.SetMountMap(4026533649, rule)
+	err = tracer.SetMountMap(4026532792, rule)
 	assert.NilError(t, err)
+
+	go tracer.ReadFromAuditEventRingBuf(tracer.objs.V_auditRb)
 
 	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
@@ -445,15 +462,17 @@ func Test_VarmorMountNewProcAccessCheck(t *testing.T) {
 	flags := 0xFFFFFFFF &^ unix.MS_REMOUNT &^
 		unix.MS_BIND &^ unix.MS_SHARED &^
 		unix.MS_PRIVATE &^ unix.MS_SLAVE &^
-		unix.MS_UNBINDABLE &^ unix.MS_MOVE &^ AA_MAY_UMOUNT
+		unix.MS_UNBINDABLE &^ unix.MS_MOVE &^ AaMayUmount
 
-	rule, err := newBpfMountRule("**", "proc", uint32(flags), 0xFFFFFFFF)
+	rule, err := newBpfMountRule(AuditMode, "**", "proc", uint32(flags), 0xFFFFFFFF)
 	assert.NilError(t, err)
 
-	err = tracer.SetMountMap(4026533649, rule)
+	err = tracer.SetMountMap(4026532792, rule)
 	assert.NilError(t, err)
 
-	stopTicker := time.NewTicker(50 * time.Second)
+	go tracer.ReadFromAuditEventRingBuf(tracer.objs.V_auditRb)
+
+	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
 
 	// err = fmt.Errorf("forced error")

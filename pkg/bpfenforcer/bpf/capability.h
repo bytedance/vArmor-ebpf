@@ -13,14 +13,20 @@
 #define CAP_LAST_CAP 40
 #define CAP_TO_MASK(x) (1ULL << x)
 
+struct capability_rule {
+  u32 mode;
+	u32 padding;
+  u64 caps;
+};
+
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__type(key, u32);
-	__type(value, u64);
+	__type(value, struct capability_rule);
 	__uint(max_entries, OUTER_MAP_ENTRIES_MAX);
 } v_capable SEC(".maps");
 
-static __always_inline u64 *get_capability_rules(u32 mnt_ns) {
+static __always_inline struct capability_rule *get_capability_rules(u32 mnt_ns) {
     return bpf_map_lookup_elem(&v_capable, &mnt_ns);
 }
 
