@@ -9,7 +9,7 @@
 #include "bpf_tracing.h"
 #include "bpf_core_read.h"
 
-#define DEBUG 1
+// #define DEBUG 1
 #ifdef DEBUG
 #define DEBUG_PRINT(fmt, args...) \
   bpf_printk(fmt, ##args)
