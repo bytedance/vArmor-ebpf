@@ -22,13 +22,14 @@ import (
 
 	"golang.org/x/sys/unix"
 	"gotest.tools/assert"
-	"k8s.io/klog/v2/klogr"
-	log "sigs.k8s.io/controller-runtime/pkg/log"
+	"k8s.io/klog/v2/textlogger"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 func Test_loadEbpf(t *testing.T) {
 
-	log.SetLogger(klogr.New())
+	c := textlogger.NewConfig()
+	log.SetLogger(textlogger.NewLogger(c))
 	enforcer := NewBpfEnforcer(log.Log.WithName("ebpf"))
 
 	err := enforcer.InitEBPF()
@@ -39,7 +40,8 @@ func Test_loadEbpf(t *testing.T) {
 
 func Test_enforcing(t *testing.T) {
 
-	log.SetLogger(klogr.New())
+	c := textlogger.NewConfig()
+	log.SetLogger(textlogger.NewLogger(c))
 	tracer := NewBpfEnforcer(log.Log.WithName("ebpf"))
 	err := tracer.InitEBPF()
 	assert.NilError(t, err)
@@ -51,7 +53,8 @@ func Test_enforcing(t *testing.T) {
 }
 
 func Test_VarmorCapable(t *testing.T) {
-	log.SetLogger(klogr.New())
+	c := textlogger.NewConfig()
+	log.SetLogger(textlogger.NewLogger(c))
 	tracer := NewBpfEnforcer(log.Log.WithName("ebpf"))
 	err := tracer.InitEBPF()
 	assert.NilError(t, err)
@@ -194,7 +197,8 @@ func Test_newBpfPathRule(t *testing.T) {
 }
 
 func Test_VarmorFileRule(t *testing.T) {
-	log.SetLogger(klogr.New())
+	c := textlogger.NewConfig()
+	log.SetLogger(textlogger.NewLogger(c))
 	tracer := NewBpfEnforcer(log.Log.WithName("ebpf"))
 	err := tracer.InitEBPF()
 	assert.NilError(t, err)
@@ -222,7 +226,8 @@ func Test_VarmorFileRule(t *testing.T) {
 }
 
 func Test_VarmorBprmCheckSecurity(t *testing.T) {
-	log.SetLogger(klogr.New())
+	c := textlogger.NewConfig()
+	log.SetLogger(textlogger.NewLogger(c))
 	tracer := NewBpfEnforcer(log.Log.WithName("ebpf"))
 	err := tracer.InitEBPF()
 	assert.NilError(t, err)
@@ -366,7 +371,8 @@ func Test_newBpfNetworkRule(t *testing.T) {
 }
 
 func Test_VarmorNetCheckSecurity(t *testing.T) {
-	log.SetLogger(klogr.New())
+	c := textlogger.NewConfig()
+	log.SetLogger(textlogger.NewLogger(c))
 	tracer := NewBpfEnforcer(log.Log.WithName("ebpf"))
 	err := tracer.InitEBPF()
 	assert.NilError(t, err)
@@ -399,7 +405,8 @@ func Test_VarmorNetCheckSecurity(t *testing.T) {
 }
 
 func Test_VarmorPtraceAccessCheck(t *testing.T) {
-	log.SetLogger(klogr.New())
+	c := textlogger.NewConfig()
+	log.SetLogger(textlogger.NewLogger(c))
 	tracer := NewBpfEnforcer(log.Log.WithName("ebpf"))
 	err := tracer.InitEBPF()
 	assert.NilError(t, err)
@@ -423,7 +430,8 @@ func Test_VarmorPtraceAccessCheck(t *testing.T) {
 }
 
 func Test_VarmorBindMountAccessCheck(t *testing.T) {
-	log.SetLogger(klogr.New())
+	c := textlogger.NewConfig()
+	log.SetLogger(textlogger.NewLogger(c))
 	tracer := NewBpfEnforcer(log.Log.WithName("ebpf"))
 	err := tracer.InitEBPF()
 	assert.NilError(t, err)
@@ -449,7 +457,8 @@ func Test_VarmorBindMountAccessCheck(t *testing.T) {
 }
 
 func Test_VarmorMountNewProcAccessCheck(t *testing.T) {
-	log.SetLogger(klogr.New())
+	c := textlogger.NewConfig()
+	log.SetLogger(textlogger.NewLogger(c))
 	tracer := NewBpfEnforcer(log.Log.WithName("ebpf"))
 	err := tracer.InitEBPF()
 	assert.NilError(t, err)
