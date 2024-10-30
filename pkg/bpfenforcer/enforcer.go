@@ -124,7 +124,7 @@ type bpfEventHeader struct {
 }
 
 type bpfCapabilityEvent struct {
-	Capability uint64
+	Capability uint32
 }
 
 type bpfPathEvent struct {

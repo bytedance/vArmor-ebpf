@@ -126,7 +126,7 @@ struct audit_event {
   u64 ktime;
   union {
     unsigned char buffer[4120];
-    u64 capability;
+    u32 capability;
     struct v_path path;
     struct v_network egress;
     struct v_ptrace ptrace;
