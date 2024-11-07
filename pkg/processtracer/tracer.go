@@ -15,7 +15,7 @@
 
 package tracer
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc $BPF_CLANG -cflags $BPF_CFLAGS -target bpfel -type event bpf bpf/tracer.c -- -I../../headers
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc $BPF_CLANG -cflags $BPF_CFLAGS -target bpfel -type process_event bpf bpf/tracer.c -- -I../../headers
 
 import (
 	"bytes"
@@ -32,21 +32,21 @@ import (
 
 const ratelimitSysctl = "/proc/sys/kernel/printk_ratelimit"
 
-type EbpfTracer struct {
+type ProcessTracer struct {
 	objs           bpfObjects
 	execLink       link.Link
 	forkLink       link.Link
 	reader         *perf.Reader
-	eventChs       map[string]chan<- bpfEvent
+	eventChs       map[string]chan<- bpfProcessEvent
 	enabled        bool
 	savedRateLimit uint64
 	log            logr.Logger
 }
 
-func NewEbpfTracer(log logr.Logger) *EbpfTracer {
-	tracer := EbpfTracer{
+func NewProcessTracer(log logr.Logger) *ProcessTracer {
+	tracer := ProcessTracer{
 		objs:           bpfObjects{},
-		eventChs:       make(map[string]chan<- bpfEvent),
+		eventChs:       make(map[string]chan<- bpfProcessEvent),
 		enabled:        false,
 		savedRateLimit: 0,
 		log:            log,
@@ -55,7 +55,7 @@ func NewEbpfTracer(log logr.Logger) *EbpfTracer {
 	return &tracer
 }
 
-func (tracer *EbpfTracer) InitEBPF() error {
+func (tracer *ProcessTracer) InitEBPF() error {
 	// Allow the current process to lock memory for eBPF resources.
 	tracer.log.Info("remove memory lock")
 	if err := rlimit.RemoveMemlock(); err != nil {
@@ -71,7 +71,7 @@ func (tracer *EbpfTracer) InitEBPF() error {
 	return nil
 }
 
-func (tracer *EbpfTracer) RemoveEBPF() error {
+func (tracer *ProcessTracer) RemoveEBPF() error {
 	tracer.log.Info("unload ebpf program")
 	err := tracer.stopTracing()
 	if err != nil {
@@ -80,7 +80,7 @@ func (tracer *EbpfTracer) RemoveEBPF() error {
 	return tracer.objs.Close()
 }
 
-func (tracer *EbpfTracer) setRateLimit() error {
+func (tracer *ProcessTracer) setRateLimit() error {
 	rateLimit, err := sysctl_read(ratelimitSysctl)
 	if err != nil {
 		return err
@@ -98,7 +98,7 @@ func (tracer *EbpfTracer) setRateLimit() error {
 	return nil
 }
 
-func (tracer *EbpfTracer) restoreRateLimit() error {
+func (tracer *ProcessTracer) restoreRateLimit() error {
 	if tracer.savedRateLimit != 0 {
 		err := sysctl_write(ratelimitSysctl, tracer.savedRateLimit)
 		if err != nil {
@@ -108,7 +108,7 @@ func (tracer *EbpfTracer) restoreRateLimit() error {
 	return nil
 }
 
-func (tracer *EbpfTracer) startTracing() error {
+func (tracer *ProcessTracer) startTracing() error {
 	// Set printk_ratelimit to 0 for recording the audit logs of AppArmor
 	err := tracer.setRateLimit()
 	if err != nil {
@@ -136,7 +136,7 @@ func (tracer *EbpfTracer) startTracing() error {
 	tracer.forkLink = forkLink
 
 	// Open a perf event reader from kernel space on the BPF_MAP_TYPE_PERF_EVENT_ARRAY map
-	reader, err := perf.NewReader(tracer.objs.Events, 8192*128)
+	reader, err := perf.NewReader(tracer.objs.ProcessEvents, 8192*128)
 	if err != nil {
 		return fmt.Errorf("perf.NewReader() failed: %v", err)
 	}
@@ -150,7 +150,7 @@ func (tracer *EbpfTracer) startTracing() error {
 	return nil
 }
 
-func (tracer *EbpfTracer) stopTracing() error {
+func (tracer *ProcessTracer) stopTracing() error {
 	tracer.log.Info("stop tracing")
 
 	if tracer.reader != nil {
@@ -175,8 +175,8 @@ func (tracer *EbpfTracer) stopTracing() error {
 	return err
 }
 
-func (tracer *EbpfTracer) traceSyscall() {
-	var event bpfEvent
+func (tracer *ProcessTracer) traceSyscall() {
+	var event bpfProcessEvent
 	for {
 		record, err := tracer.reader.Read()
 		if err != nil {
@@ -206,7 +206,7 @@ func (tracer *EbpfTracer) traceSyscall() {
 	}
 }
 
-func (tracer *EbpfTracer) AddEventCh(name string, ch chan bpfEvent) {
+func (tracer *ProcessTracer) AddEventCh(name string, ch chan bpfProcessEvent) {
 	tracer.eventChs[name] = ch
 
 	if len(tracer.eventChs) == 1 && !tracer.enabled {
@@ -217,7 +217,7 @@ func (tracer *EbpfTracer) AddEventCh(name string, ch chan bpfEvent) {
 	}
 }
 
-func (tracer *EbpfTracer) DeleteEventCh(name string) {
+func (tracer *ProcessTracer) DeleteEventCh(name string) {
 	delete(tracer.eventChs, name)
 
 	if len(tracer.eventChs) == 0 {

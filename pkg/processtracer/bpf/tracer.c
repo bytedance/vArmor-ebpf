@@ -14,9 +14,9 @@ char __license[] SEC("license") = "GPL";
 
 struct {
     __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-} events SEC(".maps");
+} process_events SEC(".maps");
 
-struct event {
+struct process_event {
     u32 type;
     u32 parent_pid;
     u32 parent_tgid;
@@ -28,7 +28,7 @@ struct event {
     unsigned char filename[MAX_FILENAME_LEN];
 };
 
-const struct event *unused __attribute__((unused));
+const struct process_event *unused __attribute__((unused));
 
 static u32 get_task_mnt_ns_id(struct task_struct *task) {
   return BPF_CORE_READ(task, nsproxy, mnt_ns, ns).inum;
@@ -43,7 +43,7 @@ int tracepoint__sched__sched_process_fork(struct bpf_raw_tracepoint_args *ctx)
     struct task_struct *parent = (struct task_struct *)ctx->args[0];
     struct task_struct *child = (struct task_struct *)ctx->args[1];
 
-    struct event event = {};
+    struct process_event event = {};
 
     event.type = 1;
     BPF_CORE_READ_INTO(&event.parent_pid, parent, pid);
@@ -54,7 +54,7 @@ int tracepoint__sched__sched_process_fork(struct bpf_raw_tracepoint_args *ctx)
     BPF_CORE_READ_STR_INTO(&event.child_task, child, comm);
     event.mnt_ns_id = get_task_mnt_ns_id(child);
 
-    bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
+    bpf_perf_event_output(ctx, &process_events, BPF_F_CURRENT_CPU, &event, sizeof(event));
 
     return 0;
 }
@@ -69,7 +69,7 @@ int tracepoint__sched__sched_process_exec(struct bpf_raw_tracepoint_args *ctx)
 
     struct task_struct *parent = BPF_CORE_READ(current, parent);
 
-    struct event event = {};
+    struct process_event event = {};
 
     event.type = 2;
     BPF_CORE_READ_INTO(&event.parent_pid, parent, pid);
@@ -81,6 +81,6 @@ int tracepoint__sched__sched_process_exec(struct bpf_raw_tracepoint_args *ctx)
     bpf_probe_read_kernel_str(&event.filename, sizeof(event.filename), BPF_CORE_READ(bprm, filename));
     event.mnt_ns_id = get_task_mnt_ns_id(current);
        
-    bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
+    bpf_perf_event_output(ctx, &process_events, BPF_F_CURRENT_CPU, &event, sizeof(event));
     return 0;
 }

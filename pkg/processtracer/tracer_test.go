@@ -30,7 +30,7 @@ func Test_loadEbpf(t *testing.T) {
 
 	c := textlogger.NewConfig()
 	log.SetLogger(textlogger.NewLogger(c))
-	tracer := NewEbpfTracer(log.Log.WithName("ebpf"))
+	tracer := NewProcessTracer(log.Log.WithName("ebpf"))
 
 	err := tracer.InitEBPF()
 	assert.NilError(t, err)
@@ -40,11 +40,11 @@ func Test_loadEbpf(t *testing.T) {
 
 func Test_customData(t *testing.T) {
 
-	eventCh := make(chan bpfEvent, 200)
+	eventCh := make(chan bpfProcessEvent, 200)
 
 	c := textlogger.NewConfig()
 	log.SetLogger(textlogger.NewLogger(c))
-	tracer := NewEbpfTracer(log.Log.WithName("ebpf"))
+	tracer := NewProcessTracer(log.Log.WithName("ebpf"))
 	err := tracer.InitEBPF()
 	assert.NilError(t, err)
 	defer tracer.RemoveEBPF()
