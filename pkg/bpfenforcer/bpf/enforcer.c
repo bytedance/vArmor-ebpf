@@ -48,7 +48,7 @@ int BPF_PROG(varmor_capable, const struct cred *cred, struct user_namespace *ns,
   DEBUG_PRINT("================ lsm/capable ================");
   
   // Permission check
-  u64 request_cap_mask = CAP_TO_MASK(cap);
+  u64 request_cap_mask = TO_MASK(cap);
 
   if (rule->caps & request_cap_mask) {
     struct user_namespace *current_ns = get_task_user_ns(current);
@@ -284,13 +284,38 @@ int BPF_PROG(varmor_socket_connect, struct socket *sock, struct sockaddr *addres
     return 0;
 
   DEBUG_PRINT("================ lsm/socket_connect ================");
-
   DEBUG_PRINT("socket status: 0x%x", sock->state);
   DEBUG_PRINT("socket type: 0x%x", sock->type);
   DEBUG_PRINT("socket flags: 0x%x", sock->flags);
 
   // Iterate all rules in the inner map
-  return iterate_net_inner_map(vnet_inner, address, mnt_ns);
+  return iterate_net_inner_map_for_socket_connect(vnet_inner, address, mnt_ns);
+}
+
+SEC("lsm/socket_create")
+int BPF_PROG(varmor_socket_create, int family, int type, int protocol, int kern) {
+  // Ignore kernel socket
+  if (kern == 1)
+    return 0;
+
+  // Retrieve the current task
+  struct task_struct *current = (struct task_struct *)bpf_get_current_task();
+
+  // Whether the current task has network access control rules
+  u32 mnt_ns = get_task_mnt_ns_id(current);
+  u32 *vnet_inner = get_net_inner_map(mnt_ns);
+  if (vnet_inner == NULL)
+    return 0;
+
+  struct v_socket s = { .domain = family, .type = type, .protocol = protocol};
+
+  DEBUG_PRINT("================ lsm/socket_create ================");
+  DEBUG_PRINT("socket family: 0x%x", family);
+  DEBUG_PRINT("socket type: 0x%x", type);
+  DEBUG_PRINT("socket protocol: 0x%x", protocol);
+
+  // Iterate all rules in the inner map
+  return iterate_net_inner_map_for_socket_create(vnet_inner, &s, mnt_ns);
 }
 
 SEC("lsm/ptrace_access_check")

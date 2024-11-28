@@ -19,12 +19,23 @@
 #define AF_INET		2	  /* Internet IP Protocol 	*/
 #define AF_INET6	10	/* IP version 6			*/
 
-struct net_rule {
-  u32 mode;
-  u32 flags;
+struct net_sockaddr {
   unsigned char address[16];
   unsigned char mask[16];
   u32 port;
+};
+
+struct net_socket {
+  u64 domains;
+  u64 types;
+  u64 protocols;
+};
+
+struct net_rule {
+  u32 mode;
+  u32 flags;
+  struct net_socket socket;
+  struct net_sockaddr addr;
 };
 
 struct {
@@ -42,7 +53,7 @@ static struct net_rule *get_net_rule(u32 *vnet_inner, u32 rule_id) {
   return bpf_map_lookup_elem(vnet_inner, &rule_id);
 }
 
-static __noinline int iterate_net_inner_map(u32 *vnet_inner, struct sockaddr *address, u32 mnt_ns) {
+static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, struct sockaddr *address, u32 mnt_ns) {
   u32 inner_id, ip, i;
   bool match;
 
@@ -53,6 +64,10 @@ static __noinline int iterate_net_inner_map(u32 *vnet_inner, struct sockaddr *ad
       DEBUG_PRINT("");
       DEBUG_PRINT("access allowed");
       return 0;
+    }
+
+    if (!(rule->flags & (CIDR_MATCH|IPV4_MATCH|IPV6_MATCH|PORT_MATCH))) {
+      continue;
     }
 
     DEBUG_PRINT("---- rule id: %d ----", inner_id);
@@ -67,7 +82,7 @@ static __noinline int iterate_net_inner_map(u32 *vnet_inner, struct sockaddr *ad
       if (rule->flags & CIDR_MATCH) {
         for (i = 0; i < 4; i++) {
           ip = (addr4->sin_addr.s_addr >> (8 * i)) & 0xff;
-          if ((ip & rule->mask[i]) != rule->address[i]) {
+          if ((ip & rule->addr.mask[i]) != rule->addr.address[i]) {
             match = false;
             break;
           }
@@ -75,14 +90,14 @@ static __noinline int iterate_net_inner_map(u32 *vnet_inner, struct sockaddr *ad
       } else if (rule->flags & PRECISE_MATCH) {
         for (i = 0; i < 4; i++) {
           ip = (addr4->sin_addr.s_addr >> (8 * i)) & 0xff;
-          if (ip != rule->address[i]) {
+          if (ip != rule->addr.address[i]) {
             match = false;
             break;
           }
         }
       }
 
-      if (match && (rule->flags & PORT_MATCH) && (rule->port != bpf_ntohs(addr4->sin_port))) {
+      if (match && (rule->flags & PORT_MATCH) && (rule->addr.port != bpf_ntohs(addr4->sin_port))) {
         match = false;
       }
       
@@ -101,9 +116,10 @@ static __noinline int iterate_net_inner_map(u32 *vnet_inner, struct sockaddr *ad
             e->mnt_ns = mnt_ns;
             e->tgid = bpf_get_current_pid_tgid()>>32;
             e->ktime = bpf_ktime_get_boot_ns();
-            e->event_u.egress.sa_family = AF_INET;
-            e->event_u.egress.sin_addr = addr4->sin_addr.s_addr;
-            e->event_u.egress.port = bpf_ntohs(addr4->sin_port);
+            e->event_u.network.type = CONNETC_TYPE;
+            e->event_u.network.addr.sa_family = AF_INET;
+            e->event_u.network.addr.sin_addr = addr4->sin_addr.s_addr;
+            e->event_u.network.addr.port = bpf_ntohs(addr4->sin_port);
             bpf_ringbuf_submit(e, 0);
           }
         }
@@ -123,7 +139,7 @@ static __noinline int iterate_net_inner_map(u32 *vnet_inner, struct sockaddr *ad
       if (rule->flags & CIDR_MATCH) {
         for (i = 0; i < 16; i++) {
           ip = ip6addr.in6_u.u6_addr8[i];
-          if ((ip & rule->mask[i]) != rule->address[i]) {
+          if ((ip & rule->addr.mask[i]) != rule->addr.address[i]) {
             match = false;
             break;
           }
@@ -131,14 +147,14 @@ static __noinline int iterate_net_inner_map(u32 *vnet_inner, struct sockaddr *ad
       } else if (rule->flags & PRECISE_MATCH) {
         for (i = 0; i < 16; i++) {
           ip = ip6addr.in6_u.u6_addr8[i];
-          if (ip != rule->address[i]) {
+          if (ip != rule->addr.address[i]) {
             match = false;
             break;
           }
         }
       }
 
-      if (match && (rule->flags & PORT_MATCH) && (rule->port != bpf_ntohs(addr6->sin6_port))) {
+      if (match && (rule->flags & PORT_MATCH) && (rule->addr.port != bpf_ntohs(addr6->sin6_port))) {
         match = false;
       }
 
@@ -157,15 +173,78 @@ static __noinline int iterate_net_inner_map(u32 *vnet_inner, struct sockaddr *ad
             e->mnt_ns = mnt_ns;
             e->tgid = bpf_get_current_pid_tgid()>>32;
             e->ktime = bpf_ktime_get_boot_ns();
-            e->event_u.egress.sa_family = AF_INET6;
-            bpf_probe_read_kernel(e->event_u.egress.sin6_addr, 16, &ip6addr.in6_u.u6_addr8);
-            e->event_u.egress.port = bpf_ntohs(addr6->sin6_port);
+            e->event_u.network.type = CONNETC_TYPE;
+            e->event_u.network.addr.sa_family = AF_INET6;
+            bpf_probe_read_kernel(e->event_u.network.addr.sin6_addr, 16, &ip6addr.in6_u.u6_addr8);
+            e->event_u.network.addr.port = bpf_ntohs(addr6->sin6_port);
             bpf_ringbuf_submit(e, 0);
           }
         }
         return -EPERM;
       }
     }
+  }
+
+  DEBUG_PRINT("");
+  DEBUG_PRINT("access allowed");
+  return 0;
+}
+
+static __noinline int iterate_net_inner_map_for_socket_create(u32 *vnet_inner, struct v_socket *s, u32 mnt_ns) {
+  u32 inner_id;
+
+  for(inner_id=0; inner_id<NET_INNER_MAP_ENTRIES_MAX; inner_id++) {
+    // The key of the inner map must start from 0
+    struct net_rule *rule = get_net_rule(vnet_inner, inner_id);
+    if (rule == NULL) {
+      DEBUG_PRINT("");
+      DEBUG_PRINT("access allowed");
+      return 0;
+    }
+
+    if (!(rule->flags & SOCKET_MATCH)) {
+      continue;
+    }
+
+    DEBUG_PRINT("---- rule id: %d ----", inner_id);
+    DEBUG_PRINT("rule domains: 0x%lx, requested domain mask: 0x%lx", rule->socket.domains, TO_MASK(s->domain));
+    DEBUG_PRINT("rule types: 0x%lx, requested domain mask: 0x%lx", rule->socket.types, TO_MASK(s->type));
+    DEBUG_PRINT("rule protocols: 0x%lx, requested domain mask: 0x%lx", rule->socket.protocols, TO_MASK(s->protocol));
+
+    if (rule->socket.domains && !(rule->socket.domains & TO_MASK(s->domain))) {
+      continue;
+    }
+
+    if (rule->socket.types && !(rule->socket.types & TO_MASK(s->type))) {
+      continue;
+    }
+
+    if (rule->socket.protocols && !(rule->socket.protocols & TO_MASK(s->protocol))) {
+      continue;
+    }
+
+    DEBUG_PRINT("");
+    DEBUG_PRINT("access denied");
+
+    // Submit the audit event
+    if (rule->mode & AUDIT_MODE) {
+      struct audit_event *e;
+      e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
+      if (e) {
+        DEBUG_PRINT("write audit event to ringbuf");
+          e->mode = AUDIT_MODE;
+          e->type = NETWORK_TYPE;
+          e->mnt_ns = mnt_ns;
+          e->tgid = bpf_get_current_pid_tgid()>>32;
+          e->ktime = bpf_ktime_get_boot_ns();
+          e->event_u.network.type = SOCKET_TYPE;
+          e->event_u.network.socket.domain = s->domain;
+          e->event_u.network.socket.type = s->type;
+          e->event_u.network.socket.protocol = s->protocol;
+          bpf_ringbuf_submit(e, 0);
+      }
+    }
+    return -EPERM;
   }
 
   DEBUG_PRINT("");

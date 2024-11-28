@@ -11,7 +11,6 @@
 #include "enforcer.h"
 
 #define CAP_LAST_CAP 40
-#define CAP_TO_MASK(x) (1ULL << x)
 
 struct capability_rule {
   u32 mode;

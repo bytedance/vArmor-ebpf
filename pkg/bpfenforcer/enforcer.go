@@ -30,155 +30,9 @@ import (
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
-	"github.com/dlclark/regexp2"
 	"github.com/go-logr/logr"
 	"golang.org/x/sys/unix"
 )
-
-const (
-	BPF_F_INNER_MAP = 0x1000
-
-	// The max count of rules for policy primitives.
-	MaxBpfFileRuleCount    = 50
-	MaxBpfBprmRuleCount    = 50
-	MaxBpfNetworkRuleCount = 50
-	MaxBpfMountRuleCount   = 50
-
-	// MaxFilePathPatternLength is the max length of path pattern,
-	// it's equal to FILE_PATH_PATTERN_SIZE_MAX in BPF code
-	MaxFilePathPatternLength = 64
-
-	// PathPatternSize is the size of `struct path_pattern` in BPF code
-	PathPatternSize = 4 + MaxFilePathPatternLength*2
-
-	// PathRuleSize is the size of `struct path_rule` in BPF code, it's
-	// also the value size of the inner map for file and execution access control.
-	PathRuleSize = 4*2 + PathPatternSize
-
-	// IpAddressSize is the size of IP address and mask.
-	IpAddressSize = 16
-
-	// NetRuleSize is the size of `struct net_rule` in BPF code, it's
-	// also the value size of the inner map for network access control.
-	NetRuleSize = 4*3 + IpAddressSize*2
-
-	// MaxFileSystemTypeLength is the max length of fstype pattern,
-	// it's equal to FILE_SYSTEM_TYPE_MAX in BPF code
-	MaxFileSystemTypeLength = 16
-
-	// MountRuleSize is the size of `struct mount_rule` in BPF code, it's
-	// also the value size of the inner map for mount access control.
-	MountRuleSize = 4*3 + MaxFileSystemTypeLength + PathPatternSize
-
-	// BPF enforcer running mode.
-	EnforceMode  = 0x00000001
-	AuditMode    = 0x00000002
-	ComplainMode = 0x00000004
-
-	// Matching Flags
-	PreciseMatch = 0x00000001
-	GreedyMatch  = 0x00000002
-	PrefixMatch  = 0x00000004
-	SuffixMatch  = 0x00000008
-	CidrMatch    = 0x00000020
-	Ipv4Match    = 0x00000040
-	Ipv6Match    = 0x00000080
-	PortMatch    = 0x00000100
-
-	// Matching Permissions
-	AaMayExec     = 0x00000001
-	AaMayWrite    = 0x00000002
-	AaMayRead     = 0x00000004
-	AaMayAppend   = 0x00000008
-	AaPtraceTrace = 0x00000002
-	AaPtraceRead  = 0x00000004
-	AaMayBeTraced = 0x00000008
-	AaMayBeRead   = 0x00000010
-	AaMayUmount   = 0x00000200
-
-	// Event type
-	CapabilityType = 0x00000001
-	FileType       = 0x00000002
-	BprmType       = 0x00000004
-	NetworkType    = 0x00000008
-	PtraceType     = 0x00000010
-	MountType      = 0x00000020
-
-	// EventHeaderSize is the size of bpf audit event header
-	EventHeaderSize = 24
-
-	// PinPath is the path we want to pin the maps
-	PinPath = "/sys/fs/bpf/varmor"
-
-	// AuditRingBufPinPath is the path we pin the audit ringbuf
-	AuditRingBufPinPath = "/sys/fs/bpf/varmor/v_audit_rb"
-)
-
-// Audit Event
-type bpfEventHeader struct {
-	Mode  uint32
-	Type  uint32
-	MntNs uint32
-	Tgid  uint32
-	Ktime uint64
-}
-
-type bpfCapabilityEvent struct {
-	Capability uint32
-}
-
-type bpfPathEvent struct {
-	Permissions uint32
-	Path        [4096]byte
-	Padding     [20]byte
-}
-
-type bpfNetworkEvent struct {
-	SaFamily uint32
-	SinAddr  uint32
-	Sin6Addr [16]byte
-	Port     uint32
-}
-
-type bpfPtraceEvent struct {
-	Permissions uint32
-	External    bool
-}
-
-type bpfMountEvent struct {
-	DevName [4096]byte
-	Type    [16]byte
-	Flags   uint32
-}
-
-// Rule definition of file policy primitive
-type bpfPathRule struct {
-	Mode        uint32
-	Permissions uint32
-	Flags       uint32
-	Prefix      [MaxFilePathPatternLength]byte
-	Suffix      [MaxFilePathPatternLength]byte
-}
-
-// Rule definition of network policy primitive
-type bpfNetworkRule struct {
-	Mode    uint32
-	Flags   uint32
-	Address [IpAddressSize]byte
-	Mask    [IpAddressSize]byte
-	Port    uint32
-}
-
-// Rule definition of mount policy primitive
-type bpfMountRule struct {
-	Mode              uint32
-	MountFlags        uint32
-	ReverseMountFlags uint32
-	Flags             uint32
-	Prefix            [MaxFilePathPatternLength]byte
-	Suffix            [MaxFilePathPatternLength]byte
-	FsType            [MaxFileSystemTypeLength]byte
-}
 
 type BpfEnforcer struct {
 	objs            bpfObjects
@@ -189,6 +43,7 @@ type BpfEnforcer struct {
 	pathRenameLink  link.Link
 	bprmLink        link.Link
 	sockConnLink    link.Link
+	socketLink      link.Link
 	ptraceLink      link.Link
 	mountLink       link.Link
 	moveMountLink   link.Link
@@ -374,6 +229,14 @@ func (enforcer *BpfEnforcer) StartEnforcing() error {
 	}
 	enforcer.sockConnLink = sockConnLink
 
+	socketLink, err := link.AttachLSM(link.LSMOptions{
+		Program: enforcer.objs.VarmorSocketCreate,
+	})
+	if err != nil {
+		return err
+	}
+	enforcer.socketLink = socketLink
+
 	ptraceLink, err := link.AttachLSM(link.LSMOptions{
 		Program: enforcer.objs.VarmorPtraceAccessCheck,
 	})
@@ -420,17 +283,11 @@ func (enforcer *BpfEnforcer) StopEnforcing() {
 	enforcer.pathRenameLink.Close()
 	enforcer.bprmLink.Close()
 	enforcer.sockConnLink.Close()
+	enforcer.socketLink.Close()
 	enforcer.ptraceLink.Close()
 	enforcer.mountLink.Close()
 	enforcer.moveMountLink.Close()
 	enforcer.umountLink.Close()
-}
-
-func newBpfCapabilityRule(mode uint32, capabilities uint64) (*bpfCapabilityRule, error) {
-	var capabilityRule bpfCapabilityRule
-	capabilityRule.Mode = mode
-	capabilityRule.Caps = capabilities
-	return &capabilityRule, nil
 }
 
 func (enforcer *BpfEnforcer) SetCapableMap(mntNsID uint32, capabilityRule *bpfCapabilityRule) error {
@@ -439,105 +296,6 @@ func (enforcer *BpfEnforcer) SetCapableMap(mntNsID uint32, capabilityRule *bpfCa
 
 func (enforcer *BpfEnforcer) ClearCapableMap(mntNsID uint32) error {
 	return enforcer.objs.V_capable.Delete(&mntNsID)
-}
-
-func reverseString(s string) string {
-	bytes := []byte(s)
-	len := len(bytes)
-
-	for i := 0; i < len/2; i++ {
-		bytes[i], bytes[len-i-1] = bytes[len-i-1], bytes[i]
-	}
-
-	return string(bytes)
-}
-
-func regexp2FindAllString(re *regexp2.Regexp, s string) []string {
-	var matches []string
-	m, _ := re.FindStringMatch(s)
-	for m != nil {
-		matches = append(matches, m.String())
-		m, _ = re.FindNextMatch(m)
-	}
-	return matches
-}
-
-func newBpfPathRule(mode uint32, pattern string, permissions uint32) (*bpfPathRule, error) {
-	// Pre-check
-	re, err := regexp2.Compile(`(?<!\*)\*(?!\*)`, regexp2.None)
-	if err != nil {
-		return nil, err
-	}
-	starWildcardLen := len(regexp2FindAllString(re, pattern))
-
-	if starWildcardLen > 0 && strings.Contains(pattern, "**") {
-		return nil, fmt.Errorf("the globbing * and ** in the pattern '%s' cannot be used at the same time", pattern)
-	}
-
-	if starWildcardLen > 1 || strings.Count(pattern, "**") > 1 {
-		return nil, fmt.Errorf("the globbing * or ** in the pattern '%s' can only be used once", pattern)
-	}
-
-	// Create bpfPathRule
-	var pathRule bpfPathRule
-	var flags uint32
-
-	pathRule.Mode = mode
-
-	if starWildcardLen > 0 {
-		if strings.Contains(pattern, "/") {
-			return nil, fmt.Errorf("the pattern '%s' with globbing * is not supported", pattern)
-		}
-		stringList := strings.Split(pattern, "*")
-
-		var prefix, suffix [MaxFilePathPatternLength]byte
-		if len(stringList[0]) > 0 {
-			copy(prefix[:], stringList[0])
-			pathRule.Prefix = prefix
-			flags |= PrefixMatch
-		}
-
-		if len(stringList[1]) > 0 {
-			copy(suffix[:], reverseString(stringList[1]))
-			pathRule.Suffix = suffix
-			flags |= SuffixMatch
-		}
-	} else if strings.Contains(pattern, "**") {
-		flags |= GreedyMatch
-
-		stringList := strings.Split(pattern, "**")
-
-		var prefix, suffix [MaxFilePathPatternLength]byte
-		if len(stringList[0]) > 0 {
-			copy(prefix[:], stringList[0])
-			pathRule.Prefix = prefix
-			flags |= PrefixMatch
-		}
-
-		if len(stringList[1]) > 0 {
-			copy(suffix[:], reverseString(stringList[1]))
-			pathRule.Suffix = suffix
-			flags |= SuffixMatch
-		}
-	} else {
-		var prefix [MaxFilePathPatternLength]byte
-		copy(prefix[:], pattern)
-		pathRule.Prefix = prefix
-		flags |= PreciseMatch | PrefixMatch
-	}
-
-	if pathRule.Prefix[MaxFilePathPatternLength-1] != 0 {
-		return nil, fmt.Errorf("the length of prefix '%s' should be less than the maximum (%d)", pathRule.Prefix, MaxFilePathPatternLength)
-	}
-
-	if pathRule.Suffix[MaxFilePathPatternLength-1] != 0 {
-		return nil, fmt.Errorf("the length of suffix '%s' should be less than the maximum (%d)", pathRule.Suffix, MaxFilePathPatternLength)
-	}
-
-	pathRule.Flags = flags
-	pathRule.Permissions = permissions
-
-	return &pathRule, nil
 }
 
 func (enforcer *BpfEnforcer) SetFileMap(mntNsID uint32, pathRule *bpfPathRule) error {
@@ -598,68 +356,6 @@ func (enforcer *BpfEnforcer) ClearBprmMap(mntNsID uint32) error {
 	return enforcer.objs.V_bprmOuter.Delete(&mntNsID)
 }
 
-func newBpfNetworkRule(mode uint32, cidr string, ipAddress string, port uint32) (*bpfNetworkRule, error) {
-	// Pre-check
-	if cidr == "" && ipAddress == "" && port == 0 {
-		return nil, fmt.Errorf("cidr, ipAddress and port cannot be empty at the same time")
-	}
-
-	if cidr != "" && ipAddress != "" {
-		return nil, fmt.Errorf("cannot set CIRD and IP address at the same time")
-	}
-
-	if port > 65535 {
-		return nil, fmt.Errorf("invalid network port")
-	}
-
-	var networkRule bpfNetworkRule
-
-	networkRule.Mode = mode
-
-	if cidr != "" {
-		networkRule.Flags |= CidrMatch
-
-		_, ipNet, err := net.ParseCIDR(cidr)
-		if err != nil {
-			return nil, err
-		}
-
-		if ipNet.IP.To4() != nil {
-			networkRule.Flags |= Ipv4Match
-			copy(networkRule.Address[:], ipNet.IP.To4())
-			copy(networkRule.Mask[:], ipNet.Mask)
-		} else {
-			networkRule.Flags |= Ipv6Match
-			copy(networkRule.Address[:], ipNet.IP.To16())
-			copy(networkRule.Mask[:], ipNet.Mask)
-		}
-	}
-
-	if ipAddress != "" {
-		networkRule.Flags |= PreciseMatch
-
-		ip := net.ParseIP(ipAddress)
-		if ip == nil {
-			return nil, fmt.Errorf("the address is not a valid textual representation of an IP address")
-		}
-
-		if ip.To4() != nil {
-			networkRule.Flags |= Ipv4Match
-			copy(networkRule.Address[:], ip.To4())
-		} else {
-			networkRule.Flags |= Ipv6Match
-			copy(networkRule.Address[:], ip.To16())
-		}
-	}
-
-	if port != 0 {
-		networkRule.Flags |= PortMatch
-		networkRule.Port = port
-	}
-
-	return &networkRule, nil
-}
-
 func (enforcer *BpfEnforcer) SetNetMap(mntNsID uint32, networkRule *bpfNetworkRule) error {
 	map_name := fmt.Sprintf("v_net_inner_%d", mntNsID)
 	innerMapSpec := ebpf.MapSpec{
@@ -688,106 +384,12 @@ func (enforcer *BpfEnforcer) ClearNetMap(mntNsID uint32) error {
 	return enforcer.objs.V_netOuter.Delete(&mntNsID)
 }
 
-func newBpfPtraceRule(mode uint32, permissions uint32, flags uint32) (*bpfPtraceRule, error) {
-	var ptraceRule bpfPtraceRule
-	ptraceRule.Mode = mode
-	ptraceRule.Permissions = permissions
-	ptraceRule.Flags = flags
-	return &ptraceRule, nil
-}
-
 func (enforcer *BpfEnforcer) SetPtraceMap(mntNsID uint32, ptraceRule *bpfPtraceRule) error {
 	return enforcer.objs.V_ptrace.Put(&mntNsID, ptraceRule)
 }
 
 func (enforcer *BpfEnforcer) ClearPtraceMap(mntNsID uint32) error {
 	return enforcer.objs.V_ptrace.Delete(&mntNsID)
-}
-
-func newBpfMountRule(mode uint32, sourcePattern string, fstype string, mountFlags uint32, reverseMountFlags uint32) (*bpfMountRule, error) {
-	// Pre-check
-	if len(fstype) >= MaxFileSystemTypeLength {
-		return nil, fmt.Errorf("the length of fstype '%s' should be less than the maximum (%d)", fstype, MaxFileSystemTypeLength)
-	}
-
-	re, err := regexp2.Compile(`(?<!\*)\*(?!\*)`, regexp2.None)
-	if err != nil {
-		return nil, err
-	}
-	starWildcardLen := len(regexp2FindAllString(re, sourcePattern))
-
-	if starWildcardLen > 0 && strings.Contains(sourcePattern, "**") {
-		return nil, fmt.Errorf("the globbing * and ** in the pattern '%s' cannot be used at the same time", sourcePattern)
-	}
-
-	if starWildcardLen > 1 || strings.Count(sourcePattern, "**") > 1 {
-		return nil, fmt.Errorf("the globbing * or ** in the pattern '%s' can only be used once", sourcePattern)
-	}
-
-	var mountRule bpfMountRule
-	var flags uint32
-
-	mountRule.Mode = mode
-
-	if starWildcardLen > 0 {
-		if strings.Contains(sourcePattern, "/") {
-			return nil, fmt.Errorf("the pattern '%s' with globbing * is not supported", sourcePattern)
-		}
-		stringList := strings.Split(sourcePattern, "*")
-
-		var prefix, suffix [MaxFilePathPatternLength]byte
-		if len(stringList[0]) > 0 {
-			copy(prefix[:], stringList[0])
-			mountRule.Prefix = prefix
-			flags |= PrefixMatch
-		}
-
-		if len(stringList[1]) > 0 {
-			copy(suffix[:], reverseString(stringList[1]))
-			mountRule.Suffix = suffix
-			flags |= SuffixMatch
-		}
-	} else if strings.Contains(sourcePattern, "**") {
-		flags |= GreedyMatch
-
-		stringList := strings.Split(sourcePattern, "**")
-
-		var prefix, suffix [MaxFilePathPatternLength]byte
-		if len(stringList[0]) > 0 {
-			copy(prefix[:], stringList[0])
-			mountRule.Prefix = prefix
-			flags |= PrefixMatch
-		}
-
-		if len(stringList[1]) > 0 {
-			copy(suffix[:], reverseString(stringList[1]))
-			mountRule.Suffix = suffix
-			flags |= SuffixMatch
-		}
-	} else {
-		var prefix [MaxFilePathPatternLength]byte
-		copy(prefix[:], sourcePattern)
-		mountRule.Prefix = prefix
-		flags |= PreciseMatch | PrefixMatch
-	}
-
-	if mountRule.Prefix[MaxFilePathPatternLength-1] != 0 {
-		return nil, fmt.Errorf("the length of prefix '%s' should be less than the maximum (%d)", mountRule.Prefix, MaxFilePathPatternLength)
-	}
-
-	if mountRule.Suffix[MaxFilePathPatternLength-1] != 0 {
-		return nil, fmt.Errorf("the length of suffix '%s' should be less than the maximum (%d)", mountRule.Suffix, MaxFilePathPatternLength)
-	}
-
-	mountRule.Flags = flags
-	mountRule.MountFlags = mountFlags
-	mountRule.ReverseMountFlags = reverseMountFlags
-
-	var s [MaxFileSystemTypeLength]byte
-	copy(s[:], fstype)
-	mountRule.FsType = s
-
-	return &mountRule, nil
 }
 
 func (enforcer *BpfEnforcer) SetMountMap(mntNsID uint32, mountRule *bpfMountRule) error {
@@ -889,14 +491,21 @@ func (enforcer *BpfEnforcer) ReadFromAuditEventRingBuf(ringbufMap *ebpf.Map) err
 					fmt.Println(err)
 				}
 
-				if event.SaFamily == unix.AF_INET {
-					ip := net.IPv4(byte(event.SinAddr), byte(event.SinAddr>>8), byte(event.SinAddr>>16), byte(event.SinAddr>>24))
-					fmt.Println("Egress IPv4 address:", ip.String())
-				} else {
-					ip := net.IP(event.Sin6Addr[:])
-					fmt.Println("Egress IPv6 address:", ip.String())
+				switch event.Type {
+				case ConnectType:
+					if event.Addr.SaFamily == unix.AF_INET {
+						ip := net.IPv4(byte(event.Addr.SinAddr), byte(event.Addr.SinAddr>>8), byte(event.Addr.SinAddr>>16), byte(event.Addr.SinAddr>>24))
+						fmt.Println("Egress IPv4 address:", ip.String())
+					} else {
+						ip := net.IP(event.Addr.Sin6Addr[:])
+						fmt.Println("Egress IPv6 address:", ip.String())
+					}
+					fmt.Println("Egress Port:", event.Addr.Port)
+				case SocketType:
+					fmt.Println("Socket Domain", event.Socket.Domain)
+					fmt.Println("Socket Type", event.Socket.Type)
+					fmt.Println("Socket Protocol", event.Socket.Protocol)
 				}
-				fmt.Println("Egress Port:", event.Port)
 
 			case PtraceType:
 				// Parse the event body of ptrace operation

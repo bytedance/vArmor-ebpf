@@ -25,6 +25,8 @@
     (type *)((char *)__mptr - offsetof(type, member));                         \
   })
 
+#define TO_MASK(x) (1ULL << x)
+
 #define	EPERM 1
 #define NAME_MAX      256
 #define PATH_MAX      4096
@@ -57,18 +59,25 @@
 #define GREEDY_MATCH  0x00000002
 #define PREFIX_MATCH  0x00000004
 #define SUFFIX_MATCH  0x00000008
+
+// Matching flags for network rule
 #define CIDR_MATCH    0x00000020
 #define IPV4_MATCH    0x00000040
 #define IPV6_MATCH    0x00000080
 #define PORT_MATCH    0x00000100
+#define SOCKET_MATCH  0x00000200
 
-// Event type
+// Event types
 #define CAPABILITY_TYPE 0x00000001
 #define FILE_TYPE       0x00000002
 #define BPRM_TYPE       0x00000004
 #define NETWORK_TYPE    0x00000008
 #define PTRACE_TYPE     0x00000010
 #define MOUNT_TYPE      0x00000020
+
+// Event subtypes for network event
+#define CONNETC_TYPE 0x00000001
+#define SOCKET_TYPE  0x00000002
 
 /*
   We use the buffer to cache file path and file name etc.
@@ -100,11 +109,23 @@ struct v_path {
   unsigned char path[PATH_MAX];
 };
 
-struct v_network {
+struct v_socket {
+  u32 domain;
+  u32 type;
+  u32 protocol;
+};
+
+struct v_sockaddr {
   u32 sa_family;
   u32 sin_addr;
   unsigned char sin6_addr[16];
   u32 port;
+};
+
+struct v_network {
+  u32 type;
+  struct v_socket socket;
+  struct v_sockaddr addr;
 };
 
 struct v_ptrace {
@@ -128,7 +149,7 @@ struct audit_event {
     unsigned char buffer[4120];
     u32 capability;
     struct v_path path;
-    struct v_network egress;
+    struct v_network network;
     struct v_ptrace ptrace;
     struct v_mount mount;
   } event_u;
