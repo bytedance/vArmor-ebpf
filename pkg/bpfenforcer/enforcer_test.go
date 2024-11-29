@@ -255,7 +255,7 @@ func Test_VarmorBprmCheckSecurity(t *testing.T) {
 	// assert.NilError(t, err)
 }
 
-func Test_newBpfNetworkRule(t *testing.T) {
+func Test_newBpfNetworkConnectRule(t *testing.T) {
 	testCases := []struct {
 		name          string
 		cidr          string
@@ -353,7 +353,7 @@ func Test_newBpfNetworkRule(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			rule, err := newBpfNetworkRule(AuditMode, tc.cidr, tc.address, tc.port)
+			rule, err := newBpfNetworkConnectRule(AuditMode, tc.cidr, tc.address, tc.port)
 			if err != nil {
 				assert.Equal(t, err.Error(), tc.expectedErr.Error())
 			} else {
@@ -370,7 +370,7 @@ func Test_newBpfNetworkRule(t *testing.T) {
 	// fmt.Println(ipNet.Contains(net.ParseIP("172.32.0.1")))
 }
 
-func Test_VarmorNetCheckSecurity(t *testing.T) {
+func Test_VarmorNetworkConnectSecurity(t *testing.T) {
 	c := textlogger.NewConfig()
 	log.SetLogger(textlogger.NewLogger(c))
 	tracer := NewBpfEnforcer(log.Log.WithName("ebpf"))
@@ -382,17 +382,72 @@ func Test_VarmorNetCheckSecurity(t *testing.T) {
 	assert.NilError(t, err)
 	defer tracer.StopEnforcing()
 
-	// rule, err := newBpfNetworkRule(AuditMode, "", "11.30.31.68", 6443)
-	// rule, err := newBpfNetworkRule(AuditMode, "", "fdbd:dc01:ff:307:9329:268d:3a27:2ca7", 0)
-	// rule, err := newBpfNetworkRule(AuditMode, "", "", 10250)
+	var rules []bpfNetworkRule
+
+	rule, err := newBpfNetworkConnectRule(AuditMode, "", "11.30.31.68", 6443)
+	assert.NilError(t, err)
+	rules = append(rules, *rule)
+
+	rule, err = newBpfNetworkConnectRule(AuditMode, "192.168.1.0/24", "", 0)
+	assert.NilError(t, err)
+	rules = append(rules, *rule)
+
 	// CIDR: 172.0.0.0/11 (172.0.0.0 ~ 172.31.255.255) test with 172.31.0.1 and 172.32.0.1
-	// rule, err := newBpfNetworkRule(AuditMode, "172.16.0.0/11", "", 0)
+	rule, err = newBpfNetworkConnectRule(AuditMode, "172.16.0.0/11", "", 0)
+	assert.NilError(t, err)
+	rules = append(rules, *rule)
+
+	rule, err = newBpfNetworkConnectRule(AuditMode, "", "fdbd:dc01:ff:307:9329:268d:3a27:2ca7", 0)
+	assert.NilError(t, err)
+	rules = append(rules, *rule)
+
 	// CIDR: 2001:db8::/31 (2001:db8:: ~ 2001:db9:ffff:ffff:ffff:ffff:ffff:ffff ) test with 2001:db8:1:: and 2001:dba:1::
-	// rule, err := newBpfNetworkRule(AuditMode, "2001:db8::/31", "", 0)
-	rule, err := newBpfNetworkRule(AuditMode, "192.168.1.0/24", "", 0)
+	rule, err = newBpfNetworkConnectRule(AuditMode, "2001:db8::/31", "", 0)
+	assert.NilError(t, err)
+	rules = append(rules, *rule)
+
+	rule, err = newBpfNetworkConnectRule(AuditMode, "", "", 10250)
+	assert.NilError(t, err)
+	rules = append(rules, *rule)
+
+	err = tracer.SetNetMap(4026533501, rules)
 	assert.NilError(t, err)
 
-	err = tracer.SetNetMap(4026532792, rule)
+	go tracer.ReadFromAuditEventRingBuf(tracer.objs.V_auditRb)
+
+	stopTicker := time.NewTicker(500 * time.Second)
+	<-stopTicker.C
+
+	// err = fmt.Errorf("forced error")
+	// assert.NilError(t, err)
+}
+
+func Test_VarmorNetworkCreateSecurity(t *testing.T) {
+	c := textlogger.NewConfig()
+	log.SetLogger(textlogger.NewLogger(c))
+	tracer := NewBpfEnforcer(log.Log.WithName("ebpf"))
+	err := tracer.InitEBPF()
+	assert.NilError(t, err)
+	defer tracer.RemoveEBPF()
+
+	err = tracer.StartEnforcing()
+	assert.NilError(t, err)
+	defer tracer.StopEnforcing()
+
+	var rules []bpfNetworkRule
+
+	rule, err := newBpfNetworkConnectRule(AuditMode, "192.168.1.0/24", "", 0)
+	assert.NilError(t, err)
+	rules = append(rules, *rule)
+
+	rule, err = newBpfNetworkCreateRule(AuditMode,
+		0,
+		0,
+		1<<unix.IPPROTO_ICMP|1<<unix.IPPROTO_ICMPV6)
+	assert.NilError(t, err)
+	rules = append(rules, *rule)
+
+	err = tracer.SetNetMap(4026533501, rules)
 	assert.NilError(t, err)
 
 	go tracer.ReadFromAuditEventRingBuf(tracer.objs.V_auditRb)
