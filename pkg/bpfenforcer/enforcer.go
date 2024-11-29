@@ -356,7 +356,7 @@ func (enforcer *BpfEnforcer) ClearBprmMap(mntNsID uint32) error {
 	return enforcer.objs.V_bprmOuter.Delete(&mntNsID)
 }
 
-func (enforcer *BpfEnforcer) SetNetMap(mntNsID uint32, networkRule *bpfNetworkRule) error {
+func (enforcer *BpfEnforcer) SetNetMap(mntNsID uint32, networkRules []bpfNetworkRule) error {
 	map_name := fmt.Sprintf("v_net_inner_%d", mntNsID)
 	innerMapSpec := ebpf.MapSpec{
 		Name:       map_name,
@@ -371,10 +371,12 @@ func (enforcer *BpfEnforcer) SetNetMap(mntNsID uint32, networkRule *bpfNetworkRu
 	}
 	defer innerMap.Close()
 
-	var index uint32 = 0
-	err = innerMap.Put(&index, networkRule)
-	if err != nil {
-		return err
+	for i, rule := range networkRules {
+		index := uint32(i)
+		err = innerMap.Put(&index, rule)
+		if err != nil {
+			return err
+		}
 	}
 
 	return enforcer.objs.V_netOuter.Put(&mntNsID, innerMap)
