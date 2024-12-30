@@ -84,7 +84,6 @@ static __always_inline int iterate_file_inner_map_for_file(u32 *vfile_inner, str
     if (rule->permissions & requested_perms) {
       if (old_path_check(&rule->pattern, buf, offset)) {
         DEBUG_PRINT("");
-        DEBUG_PRINT("access denied");
         
         // Submit the audit event
         if (rule->mode & AUDIT_MODE) {
@@ -92,7 +91,7 @@ static __always_inline int iterate_file_inner_map_for_file(u32 *vfile_inner, str
           e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
           if (e) {
             DEBUG_PRINT("write audit event to ringbuf");
-            e->mode = AUDIT_MODE;
+            e->mode = rule->mode;
             e->type = FILE_TYPE;
             e->mnt_ns = mnt_ns;
             e->tgid = bpf_get_current_pid_tgid()>>32;
@@ -102,7 +101,11 @@ static __always_inline int iterate_file_inner_map_for_file(u32 *vfile_inner, str
             bpf_ringbuf_submit(e, 0);
           }
         }
-        return -EPERM;
+
+        if (rule->mode & ENFORCE_MODE) {
+          DEBUG_PRINT("access denied");
+          return -EPERM;
+        }
       }
     }
   }
@@ -129,7 +132,6 @@ static __noinline int iterate_file_inner_map_for_path_pair(u32 *vfile_inner, str
     if (rule->permissions & AA_MAY_READ) {
       if (old_path_check(&rule->pattern, buf, offset)) {
         DEBUG_PRINT("");
-        DEBUG_PRINT("access denied");
 
         // Submit the audit event
         if (rule->mode & AUDIT_MODE) {
@@ -137,7 +139,7 @@ static __noinline int iterate_file_inner_map_for_path_pair(u32 *vfile_inner, str
           e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
           if (e) {
             DEBUG_PRINT("write audit event to ringbuf");
-            e->mode = AUDIT_MODE;
+            e->mode = rule->mode;
             e->type = FILE_TYPE;
             e->mnt_ns = mnt_ns;
             e->tgid = bpf_get_current_pid_tgid()>>32;
@@ -147,14 +149,17 @@ static __noinline int iterate_file_inner_map_for_path_pair(u32 *vfile_inner, str
             bpf_ringbuf_submit(e, 0);
           }
         }
-        return -EPERM;
+
+        if (rule->mode & ENFORCE_MODE) {
+          DEBUG_PRINT("access denied");
+          return -EPERM;
+        }
       }
     }
 
     if (rule->permissions & AA_MAY_WRITE) {
       if (new_path_check(&rule->pattern, buf, offset)) {
         DEBUG_PRINT("");
-        DEBUG_PRINT("access denied");
 
         // Submit the audit event
         if (rule->mode & AUDIT_MODE) {
@@ -162,7 +167,7 @@ static __noinline int iterate_file_inner_map_for_path_pair(u32 *vfile_inner, str
           e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
           if (e) {
             DEBUG_PRINT("write audit event to ringbuf");
-            e->mode = AUDIT_MODE;
+            e->mode = rule->mode;
             e->type = FILE_TYPE;
             e->mnt_ns = mnt_ns;
             e->tgid = bpf_get_current_pid_tgid()>>32;
@@ -172,7 +177,11 @@ static __noinline int iterate_file_inner_map_for_path_pair(u32 *vfile_inner, str
             bpf_ringbuf_submit(e, 0);
           }
         }
-        return -EPERM;
+
+        if (rule->mode & ENFORCE_MODE) {
+          DEBUG_PRINT("access denied");
+          return -EPERM;
+        }
       }
     }
   }

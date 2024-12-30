@@ -66,7 +66,7 @@ func Test_VarmorCapable(t *testing.T) {
 
 	// CAP_SYS_ADMIN: unshare -Urn
 	// CAP_NET_RAW: ping 127.0.0.1
-	capRule, _ := newBpfCapabilityRule(AuditMode, 1<<unix.CAP_NET_RAW|1<<unix.CAP_SYS_ADMIN)
+	capRule, _ := newBpfCapabilityRule(EnforceMode|AuditMode, 1<<unix.CAP_NET_RAW|1<<unix.CAP_SYS_ADMIN)
 	err = tracer.SetCapableMap(4026532792, capRule)
 	assert.NilError(t, err)
 
@@ -210,7 +210,7 @@ func Test_VarmorFileRule(t *testing.T) {
 
 	// host mnt ns id: 4026531840
 	// match /tmp/33**, /**/33, /tmp/**/33, /etc/**,
-	rule, err := newBpfPathRule(AuditMode, "/**/hostname", AaMayWrite|AaMayAppend)
+	rule, err := newBpfPathRule(EnforceMode|AuditMode, "/**/hostname", AaMayWrite|AaMayAppend)
 	assert.NilError(t, err)
 
 	err = tracer.SetFileMap(4026532792, rule)
@@ -237,7 +237,7 @@ func Test_VarmorBprmCheckSecurity(t *testing.T) {
 	assert.NilError(t, err)
 	defer tracer.StopEnforcing()
 
-	rule, err := newBpfPathRule(AuditMode, "/bin/**ng", AaMayExec)
+	rule, err := newBpfPathRule(EnforceMode|AuditMode, "/bin/**ng", AaMayExec)
 	assert.NilError(t, err)
 
 	err = tracer.SetBprmMap(4026532792, rule)
@@ -353,7 +353,7 @@ func Test_newBpfNetworkConnectRule(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			rule, err := newBpfNetworkConnectRule(AuditMode, tc.cidr, tc.address, tc.port)
+			rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, tc.cidr, tc.address, tc.port)
 			if err != nil {
 				assert.Equal(t, err.Error(), tc.expectedErr.Error())
 			} else {
@@ -384,29 +384,29 @@ func Test_VarmorNetworkConnectSecurity(t *testing.T) {
 
 	var rules []bpfNetworkRule
 
-	rule, err := newBpfNetworkConnectRule(AuditMode, "", "11.30.31.68", 6443)
+	rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "11.30.31.68", 6443)
 	assert.NilError(t, err)
 	rules = append(rules, *rule)
 
-	rule, err = newBpfNetworkConnectRule(AuditMode, "192.168.1.0/24", "", 0)
+	rule, err = newBpfNetworkConnectRule(EnforceMode|AuditMode, "192.168.1.0/24", "", 0)
 	assert.NilError(t, err)
 	rules = append(rules, *rule)
 
 	// CIDR: 172.0.0.0/11 (172.0.0.0 ~ 172.31.255.255) test with 172.31.0.1 and 172.32.0.1
-	rule, err = newBpfNetworkConnectRule(AuditMode, "172.16.0.0/11", "", 0)
+	rule, err = newBpfNetworkConnectRule(EnforceMode|AuditMode, "172.16.0.0/11", "", 0)
 	assert.NilError(t, err)
 	rules = append(rules, *rule)
 
-	rule, err = newBpfNetworkConnectRule(AuditMode, "", "fdbd:dc01:ff:307:9329:268d:3a27:2ca7", 0)
+	rule, err = newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "fdbd:dc01:ff:307:9329:268d:3a27:2ca7", 0)
 	assert.NilError(t, err)
 	rules = append(rules, *rule)
 
 	// CIDR: 2001:db8::/31 (2001:db8:: ~ 2001:db9:ffff:ffff:ffff:ffff:ffff:ffff ) test with 2001:db8:1:: and 2001:dba:1::
-	rule, err = newBpfNetworkConnectRule(AuditMode, "2001:db8::/31", "", 0)
+	rule, err = newBpfNetworkConnectRule(EnforceMode|AuditMode, "2001:db8::/31", "", 0)
 	assert.NilError(t, err)
 	rules = append(rules, *rule)
 
-	rule, err = newBpfNetworkConnectRule(AuditMode, "", "", 10250)
+	rule, err = newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "", 10250)
 	assert.NilError(t, err)
 	rules = append(rules, *rule)
 
@@ -436,11 +436,11 @@ func Test_VarmorNetworkCreateSecurity(t *testing.T) {
 
 	var rules []bpfNetworkRule
 
-	rule, err := newBpfNetworkConnectRule(AuditMode, "192.168.1.0/24", "", 0)
+	rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "192.168.1.0/24", "", 0)
 	assert.NilError(t, err)
 	rules = append(rules, *rule)
 
-	rule, err = newBpfNetworkCreateRule(AuditMode,
+	rule, err = newBpfNetworkCreateRule(EnforceMode|AuditMode,
 		0,
 		0,
 		1<<unix.IPPROTO_ICMP|1<<unix.IPPROTO_ICMPV6)
@@ -471,7 +471,7 @@ func Test_VarmorPtraceAccessCheck(t *testing.T) {
 	assert.NilError(t, err)
 	defer tracer.StopEnforcing()
 
-	rule, _ := newBpfPtraceRule(AuditMode, AaMayBeRead, GreedyMatch)
+	rule, _ := newBpfPtraceRule(EnforceMode|AuditMode, AaMayBeRead, GreedyMatch)
 	err = tracer.SetPtraceMap(4026532792, rule)
 	assert.NilError(t, err)
 
@@ -496,7 +496,7 @@ func Test_VarmorBindMountAccessCheck(t *testing.T) {
 	assert.NilError(t, err)
 	defer tracer.StopEnforcing()
 
-	rule, err := newBpfMountRule(AuditMode, "/proc**", "none", unix.MS_BIND, 0)
+	rule, err := newBpfMountRule(EnforceMode|AuditMode, "/proc**", "none", unix.MS_BIND, 0)
 	assert.NilError(t, err)
 
 	err = tracer.SetMountMap(4026532792, rule)
@@ -528,7 +528,7 @@ func Test_VarmorMountNewProcAccessCheck(t *testing.T) {
 		unix.MS_PRIVATE &^ unix.MS_SLAVE &^
 		unix.MS_UNBINDABLE &^ unix.MS_MOVE &^ AaMayUmount
 
-	rule, err := newBpfMountRule(AuditMode, "**", "proc", uint32(flags), 0xFFFFFFFF)
+	rule, err := newBpfMountRule(EnforceMode|AuditMode, "**", "proc", uint32(flags), 0xFFFFFFFF)
 	assert.NilError(t, err)
 
 	err = tracer.SetMountMap(4026532792, rule)

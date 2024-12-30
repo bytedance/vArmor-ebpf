@@ -448,7 +448,7 @@ func (enforcer *BpfEnforcer) ReadFromAuditEventRingBuf(ringbufMap *ebpf.Map) err
 		}
 
 		// Process the body of audit event
-		if eventHeader.Mode == AuditMode {
+		if eventHeader.Mode&AuditMode == AuditMode {
 			fmt.Println("PID:", eventHeader.Tgid)
 			fmt.Println("Ktime:", eventHeader.Ktime)
 			fmt.Println("Mount Namespace ID:", eventHeader.MntNs)
