@@ -69,15 +69,13 @@ int BPF_PROG(varmor_capable, const struct cred *cred, struct user_namespace *ns,
       return ret;
     }
 
-    DEBUG_PRINT("task(mnt ns: %u) is not allowed to use capability: 0x%x", mnt_ns, cap);
-
     // Submit the audit event
     if (rule->mode & AUDIT_MODE) {
       struct audit_event *e;
       e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
       if (e) {
         DEBUG_PRINT("write audit event to ringbuf");
-        e->mode = AUDIT_MODE;
+        e->mode = rule->mode;
         e->type = CAPABILITY_TYPE;
         e->mnt_ns = mnt_ns;
         e->tgid = bpf_get_current_pid_tgid()>>32;
@@ -87,7 +85,10 @@ int BPF_PROG(varmor_capable, const struct cred *cred, struct user_namespace *ns,
       }
     }
 
-    return -EPERM;
+    if (rule->mode & ENFORCE_MODE) {
+      DEBUG_PRINT("task(mnt ns: %u) is not allowed to use capability: 0x%x", mnt_ns, cap);
+      return -EPERM;
+    }
   }
 
   return ret;
@@ -336,7 +337,7 @@ int BPF_PROG(varmor_ptrace_access_check, struct task_struct *child, unsigned int
         e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
         if (e) {
           DEBUG_PRINT("write audit event to ringbuf");
-          e->mode = AUDIT_MODE;
+          e->mode = rule->mode;
           e->type = PTRACE_TYPE;
           e->mnt_ns = current_mnt_ns;
           e->tgid = bpf_get_current_pid_tgid()>>32;
@@ -346,7 +347,11 @@ int BPF_PROG(varmor_ptrace_access_check, struct task_struct *child, unsigned int
           bpf_ringbuf_submit(e, 0);
         }
       }
-      return -EPERM;
+
+      if (rule->mode & ENFORCE_MODE) {
+        DEBUG_PRINT("current task(mnt ns: %u) is not allowed to read/trace the task(mnt ns: %u)", current_mnt_ns, child_mnt_ns);
+        return -EPERM;
+      }
     }
   }
 
@@ -362,7 +367,7 @@ int BPF_PROG(varmor_ptrace_access_check, struct task_struct *child, unsigned int
         e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
         if (e) {
           DEBUG_PRINT("write audit event to ringbuf");
-          e->mode = AUDIT_MODE;
+          e->mode = rule->mode;
           e->type = PTRACE_TYPE;
           e->mnt_ns = child_mnt_ns;
           e->tgid = bpf_get_current_pid_tgid()>>32;
@@ -372,7 +377,11 @@ int BPF_PROG(varmor_ptrace_access_check, struct task_struct *child, unsigned int
           bpf_ringbuf_submit(e, 0);
         }
       }
-      return -EPERM;
+
+      if (rule->mode & ENFORCE_MODE) {
+        DEBUG_PRINT("current task(mnt ns: %u) is not allowed to readby/traceby the task(mnt ns: %u)", current_mnt_ns, child_mnt_ns);
+        return -EPERM;
+      }
     }
   }
 

@@ -103,7 +103,6 @@ static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, 
       
       if (match) {
         DEBUG_PRINT("");
-        DEBUG_PRINT("access denied");
 
         // Submit the audit event
         if (rule->mode & AUDIT_MODE) {
@@ -111,7 +110,7 @@ static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, 
           e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
           if (e) {
             DEBUG_PRINT("write audit event to ringbuf");
-            e->mode = AUDIT_MODE;
+            e->mode = rule->mode;
             e->type = NETWORK_TYPE;
             e->mnt_ns = mnt_ns;
             e->tgid = bpf_get_current_pid_tgid()>>32;
@@ -123,7 +122,11 @@ static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, 
             bpf_ringbuf_submit(e, 0);
           }
         }
-        return -EPERM;
+
+        if (rule->mode & ENFORCE_MODE) {
+          DEBUG_PRINT("access denied");
+          return -EPERM;
+        }
       }
     } else {
       // IPv6
@@ -160,7 +163,6 @@ static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, 
 
       if (match) {
         DEBUG_PRINT("");
-        DEBUG_PRINT("access denied");
 
         // Submit the audit event
         if (rule->mode & AUDIT_MODE) {
@@ -168,7 +170,7 @@ static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, 
           e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
           if (e) {
             DEBUG_PRINT("write audit event to ringbuf");
-            e->mode = AUDIT_MODE;
+            e->mode = rule->mode;
             e->type = NETWORK_TYPE;
             e->mnt_ns = mnt_ns;
             e->tgid = bpf_get_current_pid_tgid()>>32;
@@ -180,7 +182,11 @@ static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, 
             bpf_ringbuf_submit(e, 0);
           }
         }
-        return -EPERM;
+
+        if (rule->mode & ENFORCE_MODE) {
+          DEBUG_PRINT("access denied");
+          return -EPERM;
+        }
       }
     }
   }
@@ -224,7 +230,6 @@ static __noinline int iterate_net_inner_map_for_socket_create(u32 *vnet_inner, s
     }
 
     DEBUG_PRINT("");
-    DEBUG_PRINT("access denied");
 
     // Submit the audit event
     if (rule->mode & AUDIT_MODE) {
@@ -232,7 +237,7 @@ static __noinline int iterate_net_inner_map_for_socket_create(u32 *vnet_inner, s
       e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
       if (e) {
         DEBUG_PRINT("write audit event to ringbuf");
-          e->mode = AUDIT_MODE;
+          e->mode = rule->mode;
           e->type = NETWORK_TYPE;
           e->mnt_ns = mnt_ns;
           e->tgid = bpf_get_current_pid_tgid()>>32;
@@ -244,7 +249,11 @@ static __noinline int iterate_net_inner_map_for_socket_create(u32 *vnet_inner, s
           bpf_ringbuf_submit(e, 0);
       }
     }
-    return -EPERM;
+
+    if (rule->mode & ENFORCE_MODE) {
+      DEBUG_PRINT("access denied");
+      return -EPERM;
+    }
   }
 
   DEBUG_PRINT("");
