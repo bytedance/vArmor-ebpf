@@ -1,6 +1,13 @@
 CLANG ?= clang
 CFLAGS := -O2 -g -Wall -Werror $(CFLAGS)
 
+ifeq (,$(shell which goimports))
+$(shell go install golang.org/x/tools/cmd/goimports@latest)
+GO_IMPORTS=$(shell which goimports)
+else
+GO_IMPORTS=$(shell which goimports)
+endif
+
 ##@ General
 
 # The help target prints out all targets with their descriptions organized
@@ -23,17 +30,6 @@ generate-ebpf: export BPF_CLANG := $(CLANG)
 generate-ebpf: export BPF_CFLAGS := $(CFLAGS)
 generate-ebpf: ## Generate the ebpf code and lib
 	go generate ./...
-
-goimports:
-ifeq (, $(shell which goimports))
-	@{ \
-	echo "goimports not found!";\
-	echo "installing goimports...";\
-	go install golang.org/x/tools/cmd/goimports@latest
-	}
-else
-GO_IMPORTS=$(shell which goimports)
-endif
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
