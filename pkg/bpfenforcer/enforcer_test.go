@@ -415,7 +415,7 @@ func Test_VarmorNetworkConnectSecurity(t *testing.T) {
 
 	go tracer.ReadFromAuditEventRingBuf(tracer.objs.V_auditRb)
 
-	stopTicker := time.NewTicker(500 * time.Second)
+	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
 
 	// err = fmt.Errorf("forced error")
