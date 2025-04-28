@@ -14,6 +14,8 @@
 
 // Maximum rule count for network access control
 #define NET_INNER_MAP_ENTRIES_MAX 50
+// Maximum port count for network address rule
+#define PORTS_COUNT_MAX 16
 
 #define AF_UNIX		1	  /* Unix domain sockets 		*/
 #define AF_INET		2	  /* Internet IP Protocol 	*/
@@ -22,7 +24,9 @@
 struct net_sockaddr {
   unsigned char address[16];
   unsigned char mask[16];
-  u32 port;
+  u16 port;
+  u16 end_port;
+  u16 ports[PORTS_COUNT_MAX];
 };
 
 struct net_socket {
@@ -55,6 +59,7 @@ static struct net_rule *get_net_rule(u32 *vnet_inner, u32 rule_id) {
 
 static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, struct sockaddr *address, u32 mnt_ns) {
   u32 inner_id, ip, i;
+  u16 port;
   bool match;
 
   for(inner_id=0; inner_id<NET_INNER_MAP_ENTRIES_MAX; inner_id++) {
@@ -66,7 +71,7 @@ static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, 
       return 0;
     }
 
-    if (!(rule->flags & (CIDR_MATCH|IPV4_MATCH|IPV6_MATCH|PORT_MATCH))) {
+    if (!(rule->flags & (CIDR_MATCH|IPV4_MATCH|IPV6_MATCH|PORT_MATCH|PORT_RANGE_MATCH|PORTS_MATCH))) {
       continue;
     }
 
@@ -97,8 +102,23 @@ static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, 
         }
       }
 
-      if (match && (rule->flags & PORT_MATCH) && (rule->addr.port != bpf_ntohs(addr4->sin_port))) {
-        match = false;
+      port = bpf_ntohs(addr4->sin_port);
+      if (match) {
+        if ((rule->flags & PORT_MATCH) && (rule->addr.port != port)) {
+          match = false;
+        } else if ((rule->flags & PORT_RANGE_MATCH) && (rule->addr.port > port || rule->addr.end_port < port)) {
+          match = false;
+        } else if (rule->flags & PORTS_MATCH) {
+          for (i = 0; i < PORTS_COUNT_MAX; i++) {
+            if (rule->addr.ports[i] == port) {
+              break;
+            }
+            if (rule->addr.ports[i] == 0 || i == PORTS_COUNT_MAX-1) {
+              match = false;
+              break;
+            }
+          }
+        }
       }
       
       if (match) {
@@ -118,7 +138,7 @@ static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, 
             e->event_u.network.type = CONNETC_TYPE;
             e->event_u.network.addr.sa_family = AF_INET;
             e->event_u.network.addr.sin_addr = addr4->sin_addr.s_addr;
-            e->event_u.network.addr.port = bpf_ntohs(addr4->sin_port);
+            e->event_u.network.addr.port = port;
             bpf_ringbuf_submit(e, 0);
           }
         }
@@ -157,8 +177,23 @@ static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, 
         }
       }
 
-      if (match && (rule->flags & PORT_MATCH) && (rule->addr.port != bpf_ntohs(addr6->sin6_port))) {
-        match = false;
+      port = bpf_ntohs(addr6->sin6_port);
+      if (match) {
+        if ((rule->flags & PORT_MATCH) && (rule->addr.port != port)) {
+          match = false;
+        } else if ((rule->flags & PORT_RANGE_MATCH) && (rule->addr.port > port || rule->addr.end_port < port)) {
+          match = false;
+        } else if (rule->flags & PORTS_MATCH) {
+          for (i = 0; i < PORTS_COUNT_MAX; i++) {
+            if (rule->addr.ports[i] == port) {
+              break;
+            }
+            if (rule->addr.ports[i] == 0 || i == PORTS_COUNT_MAX-1) {
+              match = false;
+              break;
+            }
+          }
+        }
       }
 
       if (match) {
@@ -178,7 +213,7 @@ static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, 
             e->event_u.network.type = CONNETC_TYPE;
             e->event_u.network.addr.sa_family = AF_INET6;
             bpf_probe_read_kernel(e->event_u.network.addr.sin6_addr, 16, &ip6addr.in6_u.u6_addr8);
-            e->event_u.network.addr.port = bpf_ntohs(addr6->sin6_port);
+            e->event_u.network.addr.port = port;
             bpf_ringbuf_submit(e, 0);
           }
         }
