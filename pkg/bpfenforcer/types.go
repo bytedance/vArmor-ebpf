@@ -35,7 +35,7 @@ type bpfNetworkRule struct {
 	Mask      [IpAddressSize]byte
 	Port      uint16
 	EndPort   uint16
-	Ports     [16]uint16
+	Ports     [MaxPortsCount]uint16
 }
 
 // Rule definition of mount policy primitive

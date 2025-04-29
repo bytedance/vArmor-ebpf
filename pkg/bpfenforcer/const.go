@@ -28,27 +28,31 @@ const (
 	// it's equal to FILE_PATH_PATTERN_SIZE_MAX in BPF code
 	MaxFilePathPatternLength = 64
 
-	// PathPatternSize is the size of `struct path_pattern` in BPF code
+	// PathPatternSize is the size of pathPattern in bpfPathRule structure
 	PathPatternSize = 4 + MaxFilePathPatternLength*2
 
-	// PathRuleSize is the size of `struct path_rule` in BPF code, it's
-	// also the value size of the inner map for file and execution access control.
+	// PathRuleSize is the size of bpfPathRule structure, which must match
+	// the size of `struct path_rule` in BPF code for consistent map entry size.
 	PathRuleSize = 4*2 + PathPatternSize
-
-	// IpAddressSize is the size of IP address and mask.
-	IpAddressSize = 16
-
-	// NetRuleSize is the size of `struct net_rule` in BPF code, it's
-	// also the value size of the inner map for network access control.
-	NetRuleSize = 4*2 + 8*3 + 2*18 + IpAddressSize*2
 
 	// MaxFileSystemTypeLength is the max length of fstype pattern,
 	// it's equal to FILE_SYSTEM_TYPE_MAX in BPF code
 	MaxFileSystemTypeLength = 16
 
-	// MountRuleSize is the size of `struct mount_rule` in BPF code, it's
-	// also the value size of the inner map for mount access control.
+	// MountRuleSize is the size of bpfMountRule structure, which must match
+	// the size of `struct mount_rule` in BPF code for consistent map entry size.
 	MountRuleSize = 4*3 + MaxFileSystemTypeLength + PathPatternSize
+
+	// IpAddressSize is the size of IP address and mask.
+	IpAddressSize = 16
+
+	// MaxPortsCount is the max count of ports in network rule,
+	// it's equal to PORTS_COUNT_MAX in BPF code
+	MaxPortsCount = 16
+
+	// NetRuleSize is the size of bpfNetworkRule structure, which must match
+	// the size of `struct net_rule` in BPF code for consistent map entry size.
+	NetRuleSize = 4*2 + 8*3 + 2*(2+MaxPortsCount) + IpAddressSize*2
 
 	// BPF enforcer running mode.
 	EnforceMode  = 0x00000001
