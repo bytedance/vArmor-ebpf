@@ -129,18 +129,38 @@ func newBpfPathRule(mode uint32, pattern string, permissions uint32) (*bpfPathRu
 	return &pathRule, nil
 }
 
-func newBpfNetworkConnectRule(mode uint32, cidr string, ipAddress string, port uint32) (*bpfNetworkRule, error) {
+func newBpfNetworkConnectRule(mode uint32, cidr string, ipAddress string, port uint16, endPort uint16, ports *[]uint16) (*bpfNetworkRule, error) {
 	// Pre-check
-	if cidr == "" && ipAddress == "" && port == 0 {
-		return nil, fmt.Errorf("cidr, ipAddress and port cannot be empty at the same time")
+	if cidr == "" && ipAddress == "" && port == 0 && endPort == 0 && ports == nil {
+		return nil, fmt.Errorf("cidr, ipAddress, port, endPort and ports cannot be empty at the same time")
 	}
 
 	if cidr != "" && ipAddress != "" {
 		return nil, fmt.Errorf("cannot set CIRD and IP address at the same time")
 	}
 
-	if port > 65535 {
-		return nil, fmt.Errorf("invalid network port")
+	if (port != 0 || endPort != 0) && ports != nil {
+		return nil, fmt.Errorf("cannot set port/endPort and ports at the same time")
+	}
+
+	if port == 0 && endPort != 0 {
+		return nil, fmt.Errorf("port cannot be 0 when endPort is set")
+	}
+
+	if endPort != 0 && endPort < port {
+		return nil, fmt.Errorf("endPort cannot be less than port")
+	}
+
+	if ports != nil && len(*ports) > 16 {
+		return nil, fmt.Errorf("the number of ports cannot be greater than 16")
+	}
+
+	if ports != nil {
+		for _, p := range *ports {
+			if p == 0 {
+				return nil, fmt.Errorf("invalid network port in ports")
+			}
+		}
 	}
 
 	var networkRule bpfNetworkRule
@@ -183,7 +203,14 @@ func newBpfNetworkConnectRule(mode uint32, cidr string, ipAddress string, port u
 		}
 	}
 
-	if port != 0 {
+	if ports != nil {
+		networkRule.Flags |= PortsMatch
+		copy(networkRule.Ports[:], *ports)
+	} else if port != 0 && endPort != 0 {
+		networkRule.Flags |= PortRangeMatch
+		networkRule.Port = port
+		networkRule.EndPort = endPort
+	} else if port != 0 {
 		networkRule.Flags |= PortMatch
 		networkRule.Port = port
 	}
