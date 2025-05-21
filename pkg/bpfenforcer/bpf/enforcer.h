@@ -61,11 +61,13 @@
 #define SUFFIX_MATCH  0x00000008
 
 // Matching flags for network rule
-#define CIDR_MATCH    0x00000020
-#define IPV4_MATCH    0x00000040
-#define IPV6_MATCH    0x00000080
-#define PORT_MATCH    0x00000100
-#define SOCKET_MATCH  0x00000200
+#define CIDR_MATCH       0x00000020
+#define IPV4_MATCH       0x00000040
+#define IPV6_MATCH       0x00000080
+#define PORT_MATCH       0x00000100
+#define SOCKET_MATCH     0x00000200
+#define PORT_RANGE_MATCH 0x00000400
+#define PORTS_MATCH      0x00000800
 
 // Event types
 #define CAPABILITY_TYPE 0x00000001
@@ -119,7 +121,7 @@ struct v_sockaddr {
   u32 sa_family;
   u32 sin_addr;
   unsigned char sin6_addr[16];
-  u32 port;
+  u16 port;
 };
 
 struct v_network {
