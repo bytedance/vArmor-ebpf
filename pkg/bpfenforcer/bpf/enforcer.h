@@ -36,6 +36,9 @@
 #define AUDIT_MODE    0x00000002
 #define COMPLAIN_MODE 0x00000004
 
+// Maximum number of pods per node
+#define PODS_PER_NODE_MAX 110
+
 // Maximum containers count supported by BPF enforcer on node.
 #define OUTER_MAP_ENTRIES_MAX 100
 
@@ -61,13 +64,14 @@
 #define SUFFIX_MATCH  0x00000008
 
 // Matching flags for network rule
-#define CIDR_MATCH       0x00000020
-#define IPV4_MATCH       0x00000040
-#define IPV6_MATCH       0x00000080
-#define PORT_MATCH       0x00000100
-#define SOCKET_MATCH     0x00000200
-#define PORT_RANGE_MATCH 0x00000400
-#define PORTS_MATCH      0x00000800
+#define CIDR_MATCH        0x00000020
+#define IPV4_MATCH        0x00000040
+#define IPV6_MATCH        0x00000080
+#define PORT_MATCH        0x00000100
+#define SOCKET_MATCH      0x00000200
+#define PORT_RANGE_MATCH  0x00000400
+#define PORTS_MATCH       0x00000800
+#define POD_SELF_IP_MATCH 0x00001000
 
 // Event types
 #define CAPABILITY_TYPE 0x00000001

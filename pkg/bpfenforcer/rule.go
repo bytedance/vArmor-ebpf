@@ -187,19 +187,23 @@ func newBpfNetworkConnectRule(mode uint32, cidr string, ipAddress string, port u
 	}
 
 	if ipAddress != "" {
-		networkRule.Flags |= PreciseMatch
-
-		ip := net.ParseIP(ipAddress)
-		if ip == nil {
-			return nil, fmt.Errorf("the address is not a valid textual representation of an IP address")
-		}
-
-		if ip.To4() != nil {
-			networkRule.Flags |= Ipv4Match
-			copy(networkRule.Address[:], ip.To4())
+		if ipAddress == PodSelfIP {
+			networkRule.Flags |= PodSelfIpMatch
 		} else {
-			networkRule.Flags |= Ipv6Match
-			copy(networkRule.Address[:], ip.To16())
+			networkRule.Flags |= PreciseMatch
+
+			ip := net.ParseIP(ipAddress)
+			if ip == nil {
+				return nil, fmt.Errorf("the address is not a valid textual representation of an IP address")
+			}
+
+			if ip.To4() != nil {
+				networkRule.Flags |= Ipv4Match
+				copy(networkRule.Address[:], ip.To4())
+			} else {
+				networkRule.Flags |= Ipv6Match
+				copy(networkRule.Address[:], ip.To16())
+			}
 		}
 	}
 

@@ -384,6 +384,30 @@ func (enforcer *BpfEnforcer) ClearNetMap(mntNsID uint32) error {
 	return enforcer.objs.V_netOuter.Delete(&mntNsID)
 }
 
+func (enforcer *BpfEnforcer) SetPodIps(mntNsID uint32, addresses []string) error {
+	if len(addresses) > 2 {
+		return fmt.Errorf("pods may be allocated at most 1 value for each of IPv4 and IPv6")
+	}
+
+	var podIP bpfPodIp
+	for _, address := range addresses {
+		ip := net.ParseIP(address)
+		if ip == nil {
+			return fmt.Errorf("the address is not a valid textual representation of an IP address")
+		}
+		if ip.To4() != nil {
+			copy(podIP.Ipv4[:], ip.To4())
+		} else {
+			copy(podIP.Ipv6[:], ip.To16())
+		}
+	}
+	return enforcer.objs.V_podIp.Put(&mntNsID, podIP)
+}
+
+func (enforcer *BpfEnforcer) RemovePodIps(mntNsID uint32) error {
+	return enforcer.objs.V_podIp.Delete(&mntNsID)
+}
+
 func (enforcer *BpfEnforcer) SetPtraceMap(mntNsID uint32, ptraceRule *bpfPtraceRule) error {
 	return enforcer.objs.V_ptrace.Put(&mntNsID, ptraceRule)
 }
