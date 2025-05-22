@@ -107,7 +107,11 @@ const (
 	// AuditRingBufPinPath is the path we pin the audit ringbuf
 	AuditRingBufPinPath = "/sys/fs/bpf/varmor/v_audit_rb"
 
-	// PodSelfIP represents the IPs of the Pod where the container is located.
-	// Note that Pods may be allocated at most 1 address for each of IPv4 and IPv6.
-	PodSelfIP = "POD-SELF-IP"
+	// PodSelfIP is an entity that represents the Pod's own IP addresses.
+	// Please note that pods may be allocated at most 1 address for each of IPv4 and IPv6.
+	PodSelfIP = "pod-self"
+
+	// Unspecified is an entity that represents the all-zeros address — specifically, 0.0.0.0 and ::.
+	// Its full name is unspecified address, referring to binding to all interfaces.
+	Unspecified string = "unspecified"
 )
