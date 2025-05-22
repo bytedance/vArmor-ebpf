@@ -90,14 +90,14 @@ static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, 
       return 0;
     }
 
-    if (!(rule->flags & (CIDR_MATCH|PRECISE_MATCH|POD_SELF_IP_MATCH|IPV4_MATCH|IPV6_MATCH|PORT_MATCH|PORT_RANGE_MATCH|PORTS_MATCH))) {
+    if (!(rule->flags & (IPV4_MATCH|IPV6_MATCH|CIDR_MATCH|PRECISE_MATCH|POD_SELF_IP_MATCH|PORT_MATCH|PORT_RANGE_MATCH|PORTS_MATCH))) {
       continue;
     }
 
     DEBUG_PRINT("---- rule id: %d ----", inner_id);
     match = true;
 
-    if (address->sa_family == AF_INET) {
+    if ((address->sa_family == AF_INET) && (rule->flags & IPV4_MATCH)) {
       // IPv4
       struct sockaddr_in *addr4 = (struct sockaddr_in *) address;
       DEBUG_PRINT("IPv4 address: 0x%x", addr4->sin_addr.s_addr);
@@ -179,7 +179,7 @@ static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, 
           return -EPERM;
         }
       }
-    } else {
+    } else if ((address->sa_family == AF_INET6) && (rule->flags & IPV6_MATCH)) {
       // IPv6
       struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *) address;
       struct in6_addr ip6addr = BPF_CORE_READ(addr6, sin6_addr);
