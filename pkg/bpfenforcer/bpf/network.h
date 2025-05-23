@@ -51,6 +51,7 @@ struct {
 
 // Pods may be allocated at most 1 value for each of IPv4 and IPv6
 struct pod_ip {
+  u32 flags;
 	unsigned char ipv4[16];
   unsigned char ipv6[16];
 };
@@ -121,7 +122,7 @@ static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, 
         }
       } else if (rule->flags & POD_SELF_IP_MATCH) {
         struct pod_ip *podip = get_pod_ip(mnt_ns);
-        if (podip == NULL) {
+        if (podip == NULL || !(podip->flags & IPV4_MATCH)) {
           continue;
         }
         for (i = 0; i < 4; i++) {
@@ -208,7 +209,7 @@ static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, 
         }
       } else if (rule->flags & POD_SELF_IP_MATCH) {
         struct pod_ip *podip = get_pod_ip(mnt_ns);
-        if (podip == NULL) {
+        if (podip == NULL || !(podip->flags & IPV6_MATCH)) {
           continue;
         }
         for (i = 0; i < 16; i++) {
