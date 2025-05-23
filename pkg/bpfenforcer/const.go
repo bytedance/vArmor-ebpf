@@ -18,13 +18,13 @@ package bpfenforcer
 const (
 	BPF_F_INNER_MAP = 0x1000
 
-	// The max count of rules for policy primitives.
+	// The maximum count of rules for policy primitives.
 	MaxBpfFileRuleCount    = 50
 	MaxBpfBprmRuleCount    = 50
 	MaxBpfNetworkRuleCount = 50
 	MaxBpfMountRuleCount   = 50
 
-	// MaxFilePathPatternLength is the max length of path pattern,
+	// MaxFilePathPatternLength is the maximum length of path pattern,
 	// it's equal to FILE_PATH_PATTERN_SIZE_MAX in BPF code
 	MaxFilePathPatternLength = 64
 
@@ -35,7 +35,7 @@ const (
 	// the size of `struct path_rule` in BPF code for consistent map entry size.
 	PathRuleSize = 4*2 + PathPatternSize
 
-	// MaxFileSystemTypeLength is the max length of fstype pattern,
+	// MaxFileSystemTypeLength is the maximum length of fstype pattern,
 	// it's equal to FILE_SYSTEM_TYPE_MAX in BPF code
 	MaxFileSystemTypeLength = 16
 
@@ -46,7 +46,7 @@ const (
 	// IpAddressSize is the size of IP address and mask.
 	IpAddressSize = 16
 
-	// MaxPortsCount is the max count of ports in network rule,
+	// MaxPortsCount is the maximum count of ports in a network rule,
 	// it's equal to PORTS_COUNT_MAX in BPF code
 	MaxPortsCount = 16
 
@@ -73,6 +73,7 @@ const (
 	SocketMatch    = 0x00000200
 	PortRangeMatch = 0x00000400
 	PortsMatch     = 0x00000800
+	PodSelfIpMatch = 0x00001000
 
 	// Matching Permission
 	AaMayExec     = 0x00000001
@@ -105,4 +106,12 @@ const (
 
 	// AuditRingBufPinPath is the path we pin the audit ringbuf
 	AuditRingBufPinPath = "/sys/fs/bpf/varmor/v_audit_rb"
+
+	// PodSelfIP is an entity that represents the Pod's own IP addresses.
+	// Please note that pods may be allocated at most 1 address for each of IPv4 and IPv6.
+	PodSelfIP = "pod-self"
+
+	// Unspecified is an entity that represents the all-zeros address — specifically, 0.0.0.0 and ::.
+	// Its full name is unspecified address, referring to binding to all interfaces.
+	Unspecified string = "unspecified"
 )

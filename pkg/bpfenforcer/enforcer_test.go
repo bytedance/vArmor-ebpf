@@ -90,7 +90,7 @@ func TestEnforcement(t *testing.T) {
 			expectedError: "Operation not permitted",
 		},
 		{
-			name: "Block 11.30.31.68:6443",
+			name: "Block IP: 11.30.31.68    PORT: 6443",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
 				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "11.30.31.68", 6443, 0, nil)
@@ -106,7 +106,7 @@ func TestEnforcement(t *testing.T) {
 			expectedError: "Couldn't connect to server",
 		},
 		{
-			name: "Block 192.168.1.0/24",
+			name: "Block CIDR: 192.168.1.0/24",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
 				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "192.168.1.0/24", "", 0, 0, nil)
@@ -122,7 +122,7 @@ func TestEnforcement(t *testing.T) {
 			expectedError: "Couldn't connect to server",
 		},
 		{
-			name: "Block 172.16.0.0/11 (Allow 172.32.1.101)", // 172.31.0.1 and 172.32.0.1
+			name: "Block CIDR: 172.16.0.0/11 (Allow 172.32.1.101)", // 172.31.0.1 and 172.32.0.1
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
 				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "172.16.0.0/11", "", 0, 0, nil)
@@ -138,7 +138,7 @@ func TestEnforcement(t *testing.T) {
 			expectedError: "Connection timed out",
 		},
 		{
-			name: "Block fdbd:dc01:ff:307:9329:268d:3a27:2ca7",
+			name: "Block IP: fdbd:dc01:ff:307:9329:268d:3a27:2ca7",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
 				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "fdbd:dc01:ff:307:9329:268d:3a27:2ca7", 0, 0, nil)
@@ -154,7 +154,7 @@ func TestEnforcement(t *testing.T) {
 			expectedError: "Couldn't connect to server",
 		},
 		{
-			name: "Block 2001:db8::/31", // 2001:db8:1:: and 2001:dba:1::
+			name: "Block CIDR: 2001:db8::/31", // 2001:db8:1:: and 2001:dba:1::
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
 				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "2001:db8::/31", "", 0, 0, nil)
@@ -170,7 +170,7 @@ func TestEnforcement(t *testing.T) {
 			expectedError: "Couldn't connect to server",
 		},
 		{
-			name: "Block 2001:db8::/31 (Allow 2001:dba:2:307:9329:268d:3a27:2ca7 )", // 2001:db8:1:: and 2001:dba:1::
+			name: "Block CIDR: 2001:db8::/31 (Allow 2001:dba:2:307:9329:268d:3a27:2ca7 )", // 2001:db8:1:: and 2001:dba:1::
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
 				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "2001:db8::/31", "", 0, 0, nil)
@@ -186,7 +186,7 @@ func TestEnforcement(t *testing.T) {
 			expectedError: "Connection timed out",
 		},
 		{
-			name: "Block :10250",
+			name: "Block IP: *    PORT: 10250 (IPv4)",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
 				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "", 10250, 0, nil)
@@ -202,7 +202,23 @@ func TestEnforcement(t *testing.T) {
 			expectedError: "Couldn't connect to server",
 		},
 		{
-			name: "Block :10250 (Allow :18898)",
+			name: "Block IP: *    PORT: 10250 (IPv6)",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "", 10250, 0, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "-6", "http://[::1]:10250"},
+			expectError:   true,
+			expectedError: "Couldn't connect to server",
+		},
+		{
+			name: "Block IP: *    PORT: 10250 (Allow 127.0.0.1:18898)",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
 				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "", 10250, 0, nil)
@@ -218,7 +234,23 @@ func TestEnforcement(t *testing.T) {
 			expectedError: "Connection refused",
 		},
 		{
-			name: "Block :6670-6680",
+			name: "Block IP: *    PORT: 10250 (Allow [::1]:18898)",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "", 10250, 0, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "-6", "http://[::1]:18898"},
+			expectError:   true,
+			expectedError: "Connection refused",
+		},
+		{
+			name: "Block IP: *    PORT: 6670-6680",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
 				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "", 6670, 6680, nil)
@@ -234,7 +266,7 @@ func TestEnforcement(t *testing.T) {
 			expectedError: "Couldn't connect to server",
 		},
 		{
-			name: "Block :6670-6680 (Allow :6681)",
+			name: "Block IP: *    PORT: 6670-6680 (Allow :6681)",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
 				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "", 6670, 6680, nil)
@@ -250,7 +282,7 @@ func TestEnforcement(t *testing.T) {
 			expectedError: "Connection refused",
 		},
 		{
-			name: "Block :[6670, 6672, 6673]",
+			name: "Block IP: *    PORT: 6670,6672,6673",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
 				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "", 0, 0, &[]uint16{6670, 6672, 6673})
@@ -266,7 +298,7 @@ func TestEnforcement(t *testing.T) {
 			expectedError: "Couldn't connect to server",
 		},
 		{
-			name: "Block :[6670, 6672, 6673] (Allow :6671)",
+			name: "Block IP: *    PORT: 6670,6672,6673 (Allow :6671)",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
 				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "", 0, 0, &[]uint16{6670, 6672, 6673})
@@ -278,6 +310,374 @@ func TestEnforcement(t *testing.T) {
 				return e.ClearNetMap(id)
 			},
 			command:       []string{"curl", "http://127.0.0.1:6671"},
+			expectError:   true,
+			expectedError: "Connection refused",
+		},
+		{
+			name: "Block IPv4 'pod-self':'80-8080'",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				// mock pod ip
+				err := e.SetPodIps(id, []string{"10.0.2.10"})
+				assert.NilError(t, err)
+
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "http://10.0.2.10:8000"},
+			expectError:   true,
+			expectedError: "Couldn't connect to server",
+		},
+		{
+			name: "Block IPv4 'pod-self':'80-8080' (Allow IPv4 'pod-self':'8090')",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				// mock pod ip
+				err := e.SetPodIps(id, []string{"10.0.2.10"})
+				assert.NilError(t, err)
+
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "--connect-timeout", "1", "http://10.0.2.10:8090"},
+			expectError:   true,
+			expectedError: "Connection timed out",
+		},
+		{
+			name: "Block IPv4 'pod-self':'80-8080' (Allow IPv4 '0.0.0.0':'80')",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				// mock pod ip
+				err := e.SetPodIps(id, []string{"10.0.2.10"})
+				assert.NilError(t, err)
+
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "--connect-timeout", "1", "http://0.0.0.0:80"},
+			expectError:   true,
+			expectedError: "Connection refused",
+		},
+		{
+			name: "Block IPv4 'pod-self':'80-8080' (Allow IPv6 '::':'80')",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				// mock pod ip
+				err := e.SetPodIps(id, []string{"10.0.2.10"})
+				assert.NilError(t, err)
+
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "--connect-timeout", "1", "-6", "http://[::]:80"},
+			expectError:   true,
+			expectedError: "Connection refused",
+		},
+		{
+			name: "Block IPv6 'pod-self':'80-8080' (IPv6)",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				// mock pod ip
+				err := e.SetPodIps(id, []string{"fdbd:dc01:ff:307:9329:268d:3a27:3ca7"})
+				assert.NilError(t, err)
+
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "-6", "http://[fdbd:dc01:ff:307:9329:268d:3a27:3ca7]:8000"},
+			expectError:   true,
+			expectedError: "Couldn't connect to server",
+		},
+		{
+			name: "Block IPv6 'pod-self':'80,8080' (Allow IPv6 'pod-self':'8090')",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				// mock pod ip
+				err := e.SetPodIps(id, []string{"fdbd:dc01:ff:307:9329:268d:3a27:3ca7"})
+				assert.NilError(t, err)
+
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 0, 0, &[]uint16{80, 8080})
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "--connect-timeout", "1", "-6", "http://[fdbd:dc01:ff:307:9329:268d:3a27:3ca7]:8090"},
+			expectError:   true,
+			expectedError: "Connection timed out",
+		},
+		{
+			name: "Block IPv6 'pod-self':'80-8080' (Allow IPv6 '::':'80')",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				// mock pod ip
+				err := e.SetPodIps(id, []string{"fdbd:dc01:ff:307:9329:268d:3a27:3ca7"})
+				assert.NilError(t, err)
+
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "--connect-timeout", "1", "-6", "http://[::]:80"},
+			expectError:   true,
+			expectedError: "Connection refused",
+		},
+		{
+			name: "Block IPv6 'pod-self':'80-8080' (Allow IPv4 '0.0.0.0':'80')",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				// mock pod ip
+				err := e.SetPodIps(id, []string{"fdbd:dc01:ff:307:9329:268d:3a27:3ca7"})
+				assert.NilError(t, err)
+
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "--connect-timeout", "1", "http://0.0.0.0:80"},
+			expectError:   true,
+			expectedError: "Connection refused",
+		},
+		{
+			name: "Block IPv4 '0.0.0.0':'80-8080'",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", Unspecified, 80, 8080, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "http://0.0.0.0:6677"},
+			expectError:   true,
+			expectedError: "Couldn't connect to server",
+		},
+		{
+			name: "Block IPv4 '0.0.0.0':'80-8080'",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", Unspecified, 80, 8080, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "http://0.0.0.0:8000"},
+			expectError:   true,
+			expectedError: "Couldn't connect to server",
+		},
+		{
+			name: "Block IPv4 '0.0.0.0':'80-8080' (Allow '0.0.0.0':'9090')",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", Unspecified, 80, 8080, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "http://0.0.0.0:9090"},
+			expectError:   true,
+			expectedError: "Connection refused",
+		},
+		{
+			name: "Block IPv4 '0.0.0.0':'80-8080' (Allow '127.0.0.1':'80')",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", Unspecified, 80, 8080, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "http://127.0.0.1:80"},
+			expectError:   true,
+			expectedError: "Connection refused",
+		},
+		{
+			name: "Block IPv6 '::':'80-8080'",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", Unspecified, 80, 8080, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "-6", "http://[::]:6677"},
+			expectError:   true,
+			expectedError: "Couldn't connect to server",
+		},
+		{
+			name: "Block IPv6 '::':'80-8080'",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", Unspecified, 80, 8080, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "-6", "http://[::]:8000"},
+			expectError:   true,
+			expectedError: "Couldn't connect to server",
+		},
+		{
+			name: "Block IPv6 '::':'80-8080' (Allow '::':'9090')",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", Unspecified, 80, 8080, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "-6", "http://[::]:9090"},
+			expectError:   true,
+			expectedError: "Connection refused",
+		},
+		{
+			name: "Block IPv6 '::':'80-8080' (Allow '::1':'80')",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", Unspecified, 80, 8080, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "-6", "http://[::1]:80"},
+			expectError:   true,
+			expectedError: "Connection refused",
+		},
+		{
+			name: "Block IPv4 & IPv6 'pod-self':'80-8080'",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				// mock pod ip
+				err := e.SetPodIps(id, []string{"10.0.2.10", "fdbd:dc01:ff:307:9329:268d:3a27:3ca7"})
+				assert.NilError(t, err)
+
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "http://10.0.2.10:8000"},
+			expectError:   true,
+			expectedError: "Couldn't connect to server",
+		},
+		{
+			name: "Block IPv6 & IPv4 'pod-self':'80-8080'",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				// mock pod ip
+				err := e.SetPodIps(id, []string{"10.0.2.10", "fdbd:dc01:ff:307:9329:268d:3a27:3ca7"})
+				assert.NilError(t, err)
+
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "-6", "http://[fdbd:dc01:ff:307:9329:268d:3a27:3ca7]:8000"},
+			expectError:   true,
+			expectedError: "Couldn't connect to server",
+		},
+		{
+			name: "Block IPv4 & IPv6 'pod-self':'80-8080' (Allow '0.0.0.0':'80')",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				// mock pod ip
+				err := e.SetPodIps(id, []string{"10.0.2.10", "fdbd:dc01:ff:307:9329:268d:3a27:3ca7"})
+				assert.NilError(t, err)
+
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "http://0.0.0.0:80"},
+			expectError:   true,
+			expectedError: "Connection refused",
+		},
+		{
+			name: "Block IPv6 & IPv4 'pod-self':'80-8080' (Allow '::':'80')",
+			ruleSetup: func(e *BpfEnforcer, id uint32) error {
+				// mock pod ip
+				err := e.SetPodIps(id, []string{"10.0.2.10", "fdbd:dc01:ff:307:9329:268d:3a27:3ca7"})
+				assert.NilError(t, err)
+
+				var rules []bpfNetworkRule
+				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				assert.NilError(t, err)
+				rules = append(rules, *rule)
+				return e.SetNetMap(id, rules)
+			},
+			ruleClear: func(e *BpfEnforcer, id uint32) error {
+				return e.ClearNetMap(id)
+			},
+			command:       []string{"curl", "-6", "http://[::]:80"},
 			expectError:   true,
 			expectedError: "Connection refused",
 		},
@@ -300,6 +700,7 @@ func TestEnforcement(t *testing.T) {
 		t.Fatalf("failed to create test namespace: %v", err)
 	}
 	defer cleanup()
+	defer e.RemovePodIps(nsID)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -652,6 +1053,20 @@ func Test_newBpfNetworkConnectRule(t *testing.T) {
 			expectedAddr:  [16]byte{11, 30, 31, 68},
 			expectedPort:  6443,
 		},
+		{
+			name:          "testcase-17",
+			address:       PodSelfIP,
+			expectedFlags: PodSelfIpMatch | Ipv4Match | Ipv6Match,
+			expectedAddr:  [16]byte{},
+		},
+		{
+			name:          "testcase-18",
+			address:       PodSelfIP,
+			port:          6443,
+			expectedFlags: PodSelfIpMatch | Ipv4Match | Ipv6Match | PortMatch,
+			expectedAddr:  [16]byte{},
+			expectedPort:  6443,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -727,7 +1142,7 @@ func Test_VarmorNetworkConnectSecurity(t *testing.T) {
 
 	go e.ReadFromAuditEventRingBuf(e.objs.V_auditRb)
 
-	stopTicker := time.NewTicker(500 * time.Second)
+	stopTicker := time.NewTicker(5 * time.Second)
 	<-stopTicker.C
 
 	// err = fmt.Errorf("forced error")
