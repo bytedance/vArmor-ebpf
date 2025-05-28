@@ -169,12 +169,10 @@ func newBpfNetworkConnectRule(mode uint32, cidr string, ipAddress string, port u
 
 	if cidr != "" {
 		networkRule.Flags |= CidrMatch
-
 		_, ipNet, err := net.ParseCIDR(cidr)
 		if err != nil {
 			return nil, err
 		}
-
 		if ipNet.IP.To4() != nil {
 			networkRule.Flags |= Ipv4Match
 			copy(networkRule.Address[:], ipNet.IP.To4())
@@ -184,22 +182,27 @@ func newBpfNetworkConnectRule(mode uint32, cidr string, ipAddress string, port u
 			copy(networkRule.Address[:], ipNet.IP.To16())
 			copy(networkRule.Mask[:], ipNet.Mask)
 		}
-	}
-
-	if ipAddress != "" {
-		networkRule.Flags |= PreciseMatch
-
-		ip := net.ParseIP(ipAddress)
-		if ip == nil {
-			return nil, fmt.Errorf("the address is not a valid textual representation of an IP address")
-		}
-
-		if ip.To4() != nil {
-			networkRule.Flags |= Ipv4Match
-			copy(networkRule.Address[:], ip.To4())
-		} else {
-			networkRule.Flags |= Ipv6Match
-			copy(networkRule.Address[:], ip.To16())
+	} else {
+		switch ipAddress {
+		case "":
+			networkRule.Flags |= Ipv4Match | Ipv6Match
+		case PodSelfIP:
+			networkRule.Flags |= PodSelfIpMatch | Ipv4Match | Ipv6Match
+		case Unspecified:
+			networkRule.Flags |= PreciseMatch | Ipv4Match | Ipv6Match
+		default:
+			networkRule.Flags |= PreciseMatch
+			ip := net.ParseIP(ipAddress)
+			if ip == nil {
+				return nil, fmt.Errorf("the address is not a valid textual representation of an IP address")
+			}
+			if ip.To4() != nil {
+				networkRule.Flags |= Ipv4Match
+				copy(networkRule.Address[:], ip.To4())
+			} else {
+				networkRule.Flags |= Ipv6Match
+				copy(networkRule.Address[:], ip.To16())
+			}
 		}
 	}
 
