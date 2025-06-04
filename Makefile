@@ -49,5 +49,5 @@ test-unit: ## Run unit tests
 test: test-unit ## Run tests.
 
 .PHONY: build
-build: generate-ebpf fmt vet
+build: generate-ebpf
 	go build -o main .
