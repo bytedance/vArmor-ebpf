@@ -69,7 +69,7 @@ func readMntNsID(pid uint32) (uint32, error) {
 
 	index := strings.Index(realPath, "[")
 	if index == -1 {
-		return 0, fmt.Errorf("fatel error: can not parser mnt ns id from: %s", realPath)
+		return 0, fmt.Errorf("fatel error: can not parse mnt ns id from: %s", realPath)
 	}
 
 	id := realPath[index+1 : len(realPath)-1]
@@ -382,6 +382,32 @@ func (enforcer *BpfEnforcer) SetNetMap(mntNsID uint32, networkRules []bpfNetwork
 
 func (enforcer *BpfEnforcer) ClearNetMap(mntNsID uint32) error {
 	return enforcer.objs.V_netOuter.Delete(&mntNsID)
+}
+
+func (enforcer *BpfEnforcer) SetPodIps(mntNsID uint32, addresses []string) error {
+	if len(addresses) > 2 {
+		return fmt.Errorf("pods may be allocated at most 1 value for each of IPv4 and IPv6")
+	}
+
+	var podIP bpfPodIp
+	for _, address := range addresses {
+		ip := net.ParseIP(address)
+		if ip == nil {
+			return fmt.Errorf("the address is not a valid textual representation of an IP address")
+		}
+		if ip.To4() != nil {
+			podIP.Flags |= Ipv4Match
+			copy(podIP.Ipv4[:], ip.To4())
+		} else {
+			podIP.Flags |= Ipv6Match
+			copy(podIP.Ipv6[:], ip.To16())
+		}
+	}
+	return enforcer.objs.V_podIp.Put(&mntNsID, podIP)
+}
+
+func (enforcer *BpfEnforcer) RemovePodIps(mntNsID uint32) error {
+	return enforcer.objs.V_podIp.Delete(&mntNsID)
 }
 
 func (enforcer *BpfEnforcer) SetPtraceMap(mntNsID uint32, ptraceRule *bpfPtraceRule) error {
