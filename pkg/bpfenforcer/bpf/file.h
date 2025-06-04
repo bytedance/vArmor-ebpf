@@ -37,36 +37,6 @@ static struct path_rule *get_file_rule(u32 *vfile_inner, u32 rule_id) {
   return bpf_map_lookup_elem(vfile_inner, &rule_id);
 }
 
-/**
- * map_file_to_perms - map file flags to AppArmor permissions
- * @file: open file to map flags to AppArmor permissions
- *
- * Returns: apparmor permission set for the file
- */
-static __noinline u32 map_file_to_perms(struct file *file) {
-  u32 perms = 0;
-  unsigned int flags = BPF_CORE_READ(file, f_flags);
-  fmode_t mode = BPF_CORE_READ(file, f_mode);
-
-  DEBUG_PRINT("map_file_to_perms() - flags: 0x%x", flags);
-  DEBUG_PRINT("map_file_to_perms() - mode: 0x%x", mode);
-
-  if (mode & FMODE_WRITE)
-    perms |= MAY_WRITE;
-  if (mode & FMODE_READ)
-    perms |= MAY_READ;
-  if ((flags & O_APPEND) && (perms & MAY_WRITE))
-    perms = (perms & ~MAY_WRITE) | MAY_APPEND;
-  /* trunc implies write permission */
-  if (flags & O_TRUNC)
-    perms |= MAY_WRITE;
-  if (flags & O_CREAT)
-    perms |= AA_MAY_CREATE;
-
-  DEBUG_PRINT("map_file_to_perms() - perms: 0x%x", perms);
-  return perms;
-}
-
 static __always_inline int iterate_file_inner_map_for_file(u32 *vfile_inner, struct buffer *buf, struct buffer_offset *offset, u32 requested_perms, u32 mnt_ns) {
   for(int inner_id=0; inner_id<FILE_INNER_MAP_ENTRIES_MAX; inner_id++) {
     // The key of the inner map must start from 0
@@ -189,27 +159,6 @@ static __noinline int iterate_file_inner_map_for_path_pair(u32 *vfile_inner, str
   DEBUG_PRINT("");
   DEBUG_PRINT("access allowed");
   return 0;
-}
-
-SEC("lsm/path_link")
-int BPF_PROG(varmor_path_link_tail, struct dentry *old_dentry, const struct path *new_dir, struct dentry *new_dentry) {
-  struct buffer *buf = get_buffer();
-  if (buf == NULL)
-    return 0;
-  
-  struct buffer_offset offset;
-  bpf_probe_read(&offset, sizeof(offset), &buf->value[PATH_MAX*3-sizeof(offset)]);
-
-  u32 mnt_ns;
-  bpf_probe_read(&mnt_ns, 4, &buf->value[PATH_MAX*3-sizeof(offset)-4]);
-
-  u32 *vfile_inner = get_file_inner_map(mnt_ns);
-  if (vfile_inner == NULL) {
-    return 0;
-  }
-
-  // Iterate all rules in the inner map
-  return iterate_file_inner_map_for_path_pair(vfile_inner, buf, &offset, AA_MAY_LINK, mnt_ns);
 }
 
 SEC("lsm/path_rename")

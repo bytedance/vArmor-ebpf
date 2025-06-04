@@ -187,32 +187,6 @@ static u32 get_task_mnt_ns_id(struct task_struct *task) {
   return BPF_CORE_READ(task, nsproxy, mnt_ns, ns).inum;
 }
 
-static struct user_namespace *get_task_user_ns(struct task_struct *task) {
-  return BPF_CORE_READ(task, cred, user_ns);
-}
-
-static kernel_cap_t get_task_cap_effective(struct task_struct *task) {
-  return BPF_CORE_READ(task, cred, cap_effective);
-}
-
-// static __noinline u32 get_task_uts_ns_id(struct task_struct *task) {
-//   return BPF_CORE_READ(task, nsproxy, uts_ns, ns).inum;
-// }
-
-// static struct file *get_task_exe_file(struct task_struct *task) {
-//   return BPF_CORE_READ(task, mm, exe_file);
-// }
-
-static int task_in_execve(struct task_struct *task) {
-  unsigned long long val = 0;
-  unsigned int offset = __builtin_preserve_field_info(task->in_execve, BPF_FIELD_BYTE_OFFSET);
-  unsigned int size = __builtin_preserve_field_info(task->in_execve, BPF_FIELD_BYTE_SIZE);
-  bpf_probe_read(&val, size, (void *)task + offset);
-  val <<= __builtin_preserve_field_info(task->in_execve, BPF_FIELD_LSHIFT_U64);
-  val >>= __builtin_preserve_field_info(task->in_execve, BPF_FIELD_RSHIFT_U64);
-  return (int)val;
-}
-
 static inline struct mount *real_mount(struct vfsmount *mnt) {
   return container_of(mnt, struct mount, mnt);
 }
@@ -367,31 +341,6 @@ static __noinline int prepend_path_to_second_block(struct dentry *dentry, struct
   return 0;
 }
 
-// prepend_string_to_first_block - copy the string to the first block
-static __noinline int prepend_string_to_first_block(const char *string, struct buffer *buf, struct buffer_offset *buf_offset) {
-  int ret = bpf_probe_read_kernel_str(buf->value, PATH_MAX, string);
-  if (ret >= 0) {
-    buf_offset->first_path = ret;
-  } else {
-    return -1;
-  }
-
-  int index = 0;
-  for (; index < NAME_MAX; index++) {
-    if (buf->value[(buf_offset->first_path - 1 - index) & (PATH_MAX - 1)] == '/')
-      break;
-  }
-
-  if (index != 0 && index != NAME_MAX) {
-    ret = bpf_probe_read_kernel_str(&(buf->value[PATH_MAX*2]), NAME_MAX, &(buf->value[(buf_offset->first_path - 1 - index + 1) & (PATH_MAX - 1)]));
-    if (ret > 0)
-      buf_offset->first_name = ret - 1;
-  }
-
-  return 0;
-}
-
-
 static __noinline bool is_prefix_match(unsigned char *prefix, unsigned char *path) {
   for (int i = 0; i < FILE_PATH_PATTERN_SIZE_MAX; i++) {
     if (prefix[i] == '\0')
@@ -510,58 +459,6 @@ static __noinline bool new_path_check(struct path_pattern *pattern, struct buffe
     if ((pattern->flags & SUFFIX_MATCH) && match) {
       DEBUG_PRINT("new_path_check() - pattern suffix: %s", pattern->suffix);
       if (is_suffix_match(pattern->suffix, buf->value + PATH_MAX*2, NAME_MAX + offset->second_name - 1)) {
-        match = true;
-      } else {
-        match = false;
-      }
-    }
-  }
-
-  return match;
-}
-
-static __noinline bool head_path_check(struct path_pattern *pattern, struct buffer *buf, struct buffer_offset *offset) {
-
-  DEBUG_PRINT("head_path_check() - pattern flags: 0x%x", pattern->flags);
-
-  bool match = true;
-  if (pattern->flags & GREEDY_MATCH || pattern->flags & PRECISE_MATCH) {
-    // precise match or greedy match for the globbing "**" with file path
-    DEBUG_PRINT("head_path_check() - matching path");
-
-    if (pattern->flags & PREFIX_MATCH) {
-      DEBUG_PRINT("head_path_check() - pattern prefix: %s", pattern->prefix);
-      if (is_prefix_match(pattern->prefix, buf->value)) {
-        match = true;
-      } else {
-        match = false;
-      }
-    }
-
-    if ((pattern->flags & SUFFIX_MATCH) && match) {
-      DEBUG_PRINT("head_path_check() - pattern suffix: %s", pattern->suffix);
-      if (is_suffix_match(pattern->suffix, buf->value, offset->first_path - 2)) {
-        match = true;
-      } else {
-        match = false;
-      }
-    }
-  } else {
-    // non-greedy match for the globbing "*" with file name
-    DEBUG_PRINT("head_path_check() - matching name");
-
-    if (pattern->flags & PREFIX_MATCH) {
-      DEBUG_PRINT("head_path_check() - pattern prefix: %s", pattern->prefix);
-      if (is_prefix_match(pattern->prefix, &(buf->value[PATH_MAX * 2]))) {
-        match = true;
-      } else {
-        match = false;
-      }
-    }
-
-    if ((pattern->flags & SUFFIX_MATCH) && match) {
-      DEBUG_PRINT("head_path_check() - pattern suffix: %s", pattern->suffix);
-      if (is_suffix_match(pattern->suffix, buf->value + PATH_MAX*2, offset->first_name - 1)) {
         match = true;
       } else {
         match = false;

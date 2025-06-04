@@ -50,3 +50,4 @@ test: test-unit ## Run tests.
 
 .PHONY: build
 build: generate-ebpf fmt vet
+	go build -o main .
