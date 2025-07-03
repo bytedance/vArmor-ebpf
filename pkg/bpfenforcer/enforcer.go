@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package bpfenforcer implements the bpf enforcer.
 package bpfenforcer
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc $BPF_CLANG -cflags $BPF_CFLAGS -target bpfel -type audit_event bpf bpf/enforcer.c -- -I../../headers
@@ -130,13 +131,13 @@ func (enforcer *BpfEnforcer) InitEBPF() error {
 	}
 	collectionSpec.Maps["v_mount_outer"].InnerMap = &mountInnerMap
 
-	initMntNsId, err := readMntNsID(1)
+	initMntNsID, err := readMntNsID(1)
 	if err != nil {
 		return err
 	}
 
 	// Set the mnt ns id to the BPF program
-	collectionSpec.Variables["init_mnt_ns"].Set(initMntNsId)
+	collectionSpec.Variables["init_mnt_ns"].Set(initMntNsID)
 
 	if err := os.MkdirAll(PinPath, os.ModePerm); err != nil {
 		return fmt.Errorf("failed to create bpf fs subpath: %+v", err)
@@ -297,14 +298,13 @@ func (enforcer *BpfEnforcer) ClearCapableMap(mntNsID uint32) error {
 }
 
 func (enforcer *BpfEnforcer) SetFileMap(mntNsID uint32, pathRule *bpfPathRule) error {
-	map_name := fmt.Sprintf("v_file_inner_%d", mntNsID)
+	mapName := fmt.Sprintf("v_file_inner_%d", mntNsID)
 	innerMapSpec := ebpf.MapSpec{
-		Name:       map_name,
+		Name:       mapName,
 		Type:       ebpf.Hash,
 		KeySize:    4,
 		ValueSize:  PathRuleSize,
 		MaxEntries: MaxBpfFileRuleCount,
-		// Flags:      BPF_F_INNER_MAP,
 	}
 	innerMap, err := ebpf.NewMap(&innerMapSpec)
 	if err != nil {
@@ -326,14 +326,13 @@ func (enforcer *BpfEnforcer) ClearFileMap(mntNsID uint32) error {
 }
 
 func (enforcer *BpfEnforcer) SetBprmMap(mntNsID uint32, pathRule *bpfPathRule) error {
-	map_name := fmt.Sprintf("v_bprm_inner_%d", mntNsID)
+	mapName := fmt.Sprintf("v_bprm_inner_%d", mntNsID)
 	innerMapSpec := ebpf.MapSpec{
-		Name:       map_name,
+		Name:       mapName,
 		Type:       ebpf.Hash,
 		KeySize:    4,
 		ValueSize:  PathRuleSize,
 		MaxEntries: MaxBpfBprmRuleCount,
-		// Flags:      BPF_F_INNER_MAP,
 	}
 	innerMap, err := ebpf.NewMap(&innerMapSpec)
 	if err != nil {
@@ -355,9 +354,9 @@ func (enforcer *BpfEnforcer) ClearBprmMap(mntNsID uint32) error {
 }
 
 func (enforcer *BpfEnforcer) SetNetMap(mntNsID uint32, networkRules []bpfNetworkRule) error {
-	map_name := fmt.Sprintf("v_net_inner_%d", mntNsID)
+	mapName := fmt.Sprintf("v_net_inner_%d", mntNsID)
 	innerMapSpec := ebpf.MapSpec{
-		Name:       map_name,
+		Name:       mapName,
 		Type:       ebpf.Hash,
 		KeySize:    4,
 		ValueSize:  NetRuleSize,
@@ -419,9 +418,9 @@ func (enforcer *BpfEnforcer) ClearPtraceMap(mntNsID uint32) error {
 }
 
 func (enforcer *BpfEnforcer) SetMountMap(mntNsID uint32, mountRule *bpfMountRule) error {
-	map_name := fmt.Sprintf("v_mount_inner_%d", mntNsID)
+	mapName := fmt.Sprintf("v_mount_inner_%d", mntNsID)
 	innerMapSpec := ebpf.MapSpec{
-		Name:       map_name,
+		Name:       mapName,
 		Type:       ebpf.Hash,
 		KeySize:    4,
 		ValueSize:  MountRuleSize,

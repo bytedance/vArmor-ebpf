@@ -31,7 +31,7 @@ func indexOfZero(array []uint8) int {
 	return 0
 }
 
-func sysctl_read(path string) (string, error) {
+func sysctlRead(path string) (string, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
@@ -39,7 +39,7 @@ func sysctl_read(path string) (string, error) {
 	return strings.Trim(string(content), "\n"), nil
 }
 
-func sysctl_write(path string, value uint64) error {
+func sysctlWrite(path string, value uint64) error {
 	file, err := os.OpenFile(path, os.O_WRONLY, 0)
 	if err != nil {
 		return err

@@ -1056,14 +1056,14 @@ func Test_newBpfNetworkConnectRule(t *testing.T) {
 		{
 			name:          "testcase-17",
 			address:       PodSelfIP,
-			expectedFlags: PodSelfIpMatch | Ipv4Match | Ipv6Match,
+			expectedFlags: PodSelfIPMatch | Ipv4Match | Ipv6Match,
 			expectedAddr:  [16]byte{},
 		},
 		{
 			name:          "testcase-18",
 			address:       PodSelfIP,
 			port:          6443,
-			expectedFlags: PodSelfIpMatch | Ipv4Match | Ipv6Match | PortMatch,
+			expectedFlags: PodSelfIPMatch | Ipv4Match | Ipv6Match | PortMatch,
 			expectedAddr:  [16]byte{},
 			expectedPort:  6443,
 		},

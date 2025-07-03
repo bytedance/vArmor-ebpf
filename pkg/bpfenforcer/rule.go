@@ -187,7 +187,7 @@ func newBpfNetworkConnectRule(mode uint32, cidr string, ipAddress string, port u
 		case "":
 			networkRule.Flags |= Ipv4Match | Ipv6Match
 		case PodSelfIP:
-			networkRule.Flags |= PodSelfIpMatch | Ipv4Match | Ipv6Match
+			networkRule.Flags |= PodSelfIPMatch | Ipv4Match | Ipv6Match
 		case Unspecified:
 			networkRule.Flags |= PreciseMatch | Ipv4Match | Ipv6Match
 		default:
