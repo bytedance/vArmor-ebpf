@@ -31,8 +31,8 @@ type bpfNetworkRule struct {
 	Domains   uint64
 	Types     uint64
 	Protocols uint64
-	Address   [IpAddressSize]byte
-	Mask      [IpAddressSize]byte
+	Address   [IPAddressSize]byte
+	Mask      [IPAddressSize]byte
 	Port      uint16
 	EndPort   uint16
 	Ports     [MaxPortsCount]uint16

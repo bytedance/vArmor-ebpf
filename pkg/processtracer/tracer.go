@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package tracer implements the process tracer
 package tracer
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc $BPF_CLANG -cflags $BPF_CFLAGS -target bpfel -type process_event bpf bpf/tracer.c -- -I../../headers
@@ -81,7 +82,7 @@ func (tracer *ProcessTracer) RemoveEBPF() error {
 }
 
 func (tracer *ProcessTracer) setRateLimit() error {
-	rateLimit, err := sysctl_read(ratelimitSysctl)
+	rateLimit, err := sysctlRead(ratelimitSysctl)
 	if err != nil {
 		return err
 	}
@@ -90,7 +91,7 @@ func (tracer *ProcessTracer) setRateLimit() error {
 		return err
 	}
 	if tracer.savedRateLimit != 0 {
-		err := sysctl_write(ratelimitSysctl, 0)
+		err := sysctlWrite(ratelimitSysctl, 0)
 		if err != nil {
 			return err
 		}
@@ -100,7 +101,7 @@ func (tracer *ProcessTracer) setRateLimit() error {
 
 func (tracer *ProcessTracer) restoreRateLimit() error {
 	if tracer.savedRateLimit != 0 {
-		err := sysctl_write(ratelimitSysctl, tracer.savedRateLimit)
+		err := sysctlWrite(ratelimitSysctl, tracer.savedRateLimit)
 		if err != nil {
 			return err
 		}
