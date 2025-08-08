@@ -31,7 +31,11 @@ import (
 	"github.com/go-logr/logr"
 )
 
-const ratelimitSysctl = "/proc/sys/kernel/printk_ratelimit"
+const (
+	ratelimitSysctl         = "/proc/sys/kernel/printk_ratelimit"
+	schedProcessFork uint32 = 1
+	schedProcessExec uint32 = 2
+)
 
 type ProcessTracer struct {
 	objs           bpfObjects

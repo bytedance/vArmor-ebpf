@@ -71,30 +71,30 @@ LOOP:
 
 		case event := <-eventCh:
 
-			len := indexOfZero(event.ParentTask[:])
-			parentTask := string(event.ParentTask[:len])
+			len := indexOfZero(event.ParentComm[:])
+			parentComm := string(event.ParentComm[:len])
 
-			len = indexOfZero(event.ChildTask[:])
-			childTask := string(event.ChildTask[:len])
+			len = indexOfZero(event.ChildComm[:])
+			childComm := string(event.ChildComm[:len])
 
 			len = indexOfZero(event.Filename[:])
 			fileName := string(event.Filename[:len])
 
 			eventType := ""
-			if event.Type == 1 {
+			if event.Type == schedProcessFork {
 				eventType = "sched_process_fork"
 			} else {
 				eventType = "sched_process_exec"
 			}
-			output := fmt.Sprintf("%-24s |%-12d %-12d %-20s | %-12d %-12d %-20s | %-12d %s\n",
+			output := fmt.Sprintf("%-24s |%-12d %-12d %-20s %-12d | %-12d %-12d %-20s %-12d | %s\n",
 				eventType,
-				event.ParentPid, event.ParentTgid, parentTask,
-				event.ChildPid, event.ChildTgid, childTask,
-				event.MntNsId, fileName,
+				event.ParentPid, event.ParentTgid, parentComm, event.ParentMntNsId,
+				event.ChildPid, event.ChildTgid, childComm, event.ChildMntNsId,
+				fileName,
 			)
 			fmt.Println(output)
 
-			if event.MntNsId == mntNsID {
+			if event.ChildMntNsId == mntNsID {
 				mntCount += 1
 			}
 

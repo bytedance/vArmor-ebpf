@@ -9,6 +9,8 @@
 #define MAX_ENV_LEN 256
 #define MAX_ENV_EXTRACT_LOOP_COUNT 400
 #define TASK_COMM_LEN 16
+#define SCHED_PROCESS_FORK 1
+#define SCHED_PROCESS_EXEC 2
 
 char __license[] SEC("license") = "GPL";
 
@@ -20,11 +22,12 @@ struct process_event {
     u32 type;
     u32 parent_pid;
     u32 parent_tgid;
+    u32 parent_mnt_ns_id;
     u32 child_pid;
     u32 child_tgid;
-    u32 mnt_ns_id;
-    unsigned char parent_task[TASK_COMM_LEN];
-    unsigned char child_task[TASK_COMM_LEN];
+    u32 child_mnt_ns_id;
+    unsigned char parent_comm[TASK_COMM_LEN];
+    unsigned char child_comm[TASK_COMM_LEN];
     unsigned char filename[MAX_FILENAME_LEN];
 };
 
@@ -45,14 +48,15 @@ int tracepoint__sched__sched_process_fork(struct bpf_raw_tracepoint_args *ctx)
 
     struct process_event event = {};
 
-    event.type = 1;
+    event.type = SCHED_PROCESS_FORK;
     BPF_CORE_READ_INTO(&event.parent_pid, parent, pid);
     BPF_CORE_READ_INTO(&event.parent_tgid, parent, tgid);
-    BPF_CORE_READ_STR_INTO(&event.parent_task, parent, comm);
+    BPF_CORE_READ_STR_INTO(&event.parent_comm, parent, comm);
+    event.parent_mnt_ns_id = get_task_mnt_ns_id(parent);
     BPF_CORE_READ_INTO(&event.child_pid, child, pid);
     BPF_CORE_READ_INTO(&event.child_tgid, child, tgid);
-    BPF_CORE_READ_STR_INTO(&event.child_task, child, comm);
-    event.mnt_ns_id = get_task_mnt_ns_id(child);
+    BPF_CORE_READ_STR_INTO(&event.child_comm, child, comm);
+    event.child_mnt_ns_id = get_task_mnt_ns_id(child);
 
     bpf_perf_event_output(ctx, &process_events, BPF_F_CURRENT_CPU, &event, sizeof(event));
 
@@ -71,15 +75,16 @@ int tracepoint__sched__sched_process_exec(struct bpf_raw_tracepoint_args *ctx)
 
     struct process_event event = {};
 
-    event.type = 2;
+    event.type = SCHED_PROCESS_EXEC;
     BPF_CORE_READ_INTO(&event.parent_pid, parent, pid);
     BPF_CORE_READ_INTO(&event.parent_tgid, parent, tgid);
-    BPF_CORE_READ_STR_INTO(&event.parent_task, parent, comm);
+    BPF_CORE_READ_STR_INTO(&event.parent_comm, parent, comm);
+    event.parent_mnt_ns_id = get_task_mnt_ns_id(parent);
     BPF_CORE_READ_INTO(&event.child_pid, current, pid);
     BPF_CORE_READ_INTO(&event.child_tgid, current, tgid);
-    BPF_CORE_READ_STR_INTO(&event.child_task, current, comm);
+    BPF_CORE_READ_STR_INTO(&event.child_comm, current, comm);
     bpf_probe_read_kernel_str(&event.filename, sizeof(event.filename), BPF_CORE_READ(bprm, filename));
-    event.mnt_ns_id = get_task_mnt_ns_id(current);
+    event.child_mnt_ns_id = get_task_mnt_ns_id(current);
        
     bpf_perf_event_output(ctx, &process_events, BPF_F_CURRENT_CPU, &event, sizeof(event));
     return 0;
