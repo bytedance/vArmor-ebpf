@@ -1,11 +1,9 @@
 module github.com/bytedance/vArmor-ebpf
 
-go 1.23.0
-
-toolchain go1.23.7
+go 1.24
 
 require (
-	github.com/cilium/ebpf v0.18.0
+	github.com/cilium/ebpf v0.19.0
 	github.com/dlclark/regexp2 v1.9.0
 	github.com/go-logr/logr v1.4.2
 	golang.org/x/sys v0.35.0
