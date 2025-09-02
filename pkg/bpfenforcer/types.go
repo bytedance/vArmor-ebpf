@@ -51,11 +51,11 @@ type bpfMountRule struct {
 
 // Audit Event
 type bpfEventHeader struct {
-	Mode  uint32
-	Type  uint32
-	MntNs uint32
-	Tgid  uint32
-	Ktime uint64
+	Action uint32
+	Type   uint32
+	MntNs  uint32
+	Tgid   uint32
+	Ktime  uint64
 }
 
 type bpfCapabilityEvent struct {
@@ -93,7 +93,7 @@ type bpfPtraceEvent struct {
 }
 
 type bpfMountEvent struct {
-	DevName [4096]byte
-	Type    [16]byte
-	Flags   uint32
+	Path  [4096]byte
+	Type  [16]byte
+	Flags uint32
 }

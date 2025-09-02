@@ -91,7 +91,7 @@ static __always_inline int iterate_file_inner_map_for_file(u32 *vfile_inner, str
           e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
           if (e) {
             DEBUG_PRINT("write audit event to ringbuf");
-            e->mode = rule->mode;
+            e->action = rule->mode & DENY_MODE ? DENIED_ACTION : AUDIT_ACTION;
             e->type = FILE_TYPE;
             e->mnt_ns = mnt_ns;
             e->tgid = bpf_get_current_pid_tgid()>>32;
@@ -102,7 +102,7 @@ static __always_inline int iterate_file_inner_map_for_file(u32 *vfile_inner, str
           }
         }
 
-        if (rule->mode & ENFORCE_MODE) {
+        if (rule->mode & DENY_MODE) {
           DEBUG_PRINT("access denied");
           return -EPERM;
         }
@@ -139,18 +139,18 @@ static __noinline int iterate_file_inner_map_for_path_pair(u32 *vfile_inner, str
           e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
           if (e) {
             DEBUG_PRINT("write audit event to ringbuf");
-            e->mode = rule->mode;
+            e->action = rule->mode & DENY_MODE ? DENIED_ACTION : AUDIT_ACTION;
             e->type = FILE_TYPE;
             e->mnt_ns = mnt_ns;
             e->tgid = bpf_get_current_pid_tgid()>>32;
             e->ktime = bpf_ktime_get_boot_ns();
-            e->event_u.path.permissions = AA_MAY_READ;
+            e->event_u.path.permissions = requested_perms | AA_MAY_READ;
             bpf_probe_read_kernel_str(&e->event_u.path.path, PATH_MAX-offset->first_path & (PATH_MAX-1), &(buf->value[offset->first_path & (PATH_MAX-1)]));
             bpf_ringbuf_submit(e, 0);
           }
         }
 
-        if (rule->mode & ENFORCE_MODE) {
+        if (rule->mode & DENY_MODE) {
           DEBUG_PRINT("access denied");
           return -EPERM;
         }
@@ -167,18 +167,18 @@ static __noinline int iterate_file_inner_map_for_path_pair(u32 *vfile_inner, str
           e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
           if (e) {
             DEBUG_PRINT("write audit event to ringbuf");
-            e->mode = rule->mode;
+            e->action = rule->mode & DENY_MODE ? DENIED_ACTION : AUDIT_ACTION;
             e->type = FILE_TYPE;
             e->mnt_ns = mnt_ns;
             e->tgid = bpf_get_current_pid_tgid()>>32;
             e->ktime = bpf_ktime_get_boot_ns();
-            e->event_u.path.permissions = AA_MAY_WRITE;
+            e->event_u.path.permissions = requested_perms | AA_MAY_WRITE;
             bpf_probe_read_kernel_str(&e->event_u.path.path, PATH_MAX*2-offset->second_path & (PATH_MAX-1), &(buf->value[offset->second_path & (PATH_MAX*2-1)]));
             bpf_ringbuf_submit(e, 0);
           }
         }
 
-        if (rule->mode & ENFORCE_MODE) {
+        if (rule->mode & DENY_MODE) {
           DEBUG_PRINT("access denied");
           return -EPERM;
         }

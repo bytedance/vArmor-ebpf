@@ -31,10 +31,18 @@
 #define NAME_MAX      256
 #define PATH_MAX      4096
 
-// BPF enforcer running mode.
-#define ENFORCE_MODE  0x00000001
-#define AUDIT_MODE    0x00000002
-#define COMPLAIN_MODE 0x00000004
+// Profile mode
+#define ENFORCE_MODE 0x00000001
+#define COMPLAIN_MODE 0x00000002
+
+// Rule mode
+#define DENY_MODE   0x00000001
+#define AUDIT_MODE  0x00000002
+
+// Enforcement action
+#define DENIED_ACTION  0x00000001
+#define AUDIT_ACTION   0x00000002
+#define ALLOWED_ACTION 0x00000004
 
 // Maximum number of pods per node
 #define PODS_PER_NODE_MAX 110
@@ -85,6 +93,19 @@
 #define CONNETC_TYPE 0x00000001
 #define SOCKET_TYPE  0x00000002
 
+// v_profile_mode is a hash map to store the profile mode for the target.
+// The key is the mount namespace ID, and the value is the profile mode.
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, u32);
+	__type(value, u32);
+	__uint(max_entries, OUTER_MAP_ENTRIES_MAX);
+} v_profile_mode SEC(".maps");
+
+static __always_inline u32 *get_profile_mode(u32 mnt_ns) {
+    return bpf_map_lookup_elem(&v_profile_mode, &mnt_ns);
+}
+
 /*
   We use the buffer to cache file path and file name etc.
   |---------------------------------------|---------------------------------------|---------------------------------------|
@@ -103,6 +124,15 @@ struct buffer {
   unsigned char value[BUFFER_MAX];
 };
 
+// buffer_offset cache the offset of the file path and file name in the buffer.
+struct buffer_offset {
+  u32 first_path;
+  u32 first_name;
+  u32 second_path;
+  u32 second_name;
+};
+
+// v_buffer is a per-CPU array for the buffer.  
 struct {
   __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
   __type(key, u32);
@@ -140,13 +170,14 @@ struct v_ptrace {
 };
 
 struct v_mount {
-  unsigned char dev_name[PATH_MAX];
+  unsigned char path[PATH_MAX];
   unsigned char type[FILE_SYSTEM_TYPE_MAX];
   u32 flags;
 };
 
+// audit_event is the event structure for auditing and modeling.
 struct audit_event {
-  u32 mode;
+  u32 action;
   u32 type;
   u32 mnt_ns;
   u32 tgid;
@@ -163,18 +194,12 @@ struct audit_event {
 
 const struct audit_event *unused __attribute__((unused));
 
+// v_audit_rb is a ring buffer to cache audit events
 struct {
   __uint(type, BPF_MAP_TYPE_RINGBUF);
   __uint(max_entries, RING_BUFFER_MAX);
   __uint(pinning, LIBBPF_PIN_BY_NAME);
 } v_audit_rb SEC(".maps");
-
-struct buffer_offset {
-  u32 first_path;
-  u32 first_name;
-  u32 second_path;
-  u32 second_name;
-};
 
 struct path_pattern {
   u32 flags;
@@ -199,7 +224,7 @@ static kernel_cap_t get_task_cap_effective(struct task_struct *task) {
   return BPF_CORE_READ(task, cred, cap_effective);
 }
 
-// static __noinline u32 get_task_uts_ns_id(struct task_struct *task) {
+// static u32 get_task_uts_ns_id(struct task_struct *task) {
 //   return BPF_CORE_READ(task, nsproxy, uts_ns, ns).inum;
 // }
 

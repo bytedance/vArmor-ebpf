@@ -52,7 +52,7 @@ static __noinline int iterate_bprm_inner_map_for_executable(u32 *vbprm_inner, st
         e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
         if (e) {
           DEBUG_PRINT("write audit event to ringbuf");
-          e->mode = rule->mode;
+          e->action = rule->mode & DENY_MODE ? DENIED_ACTION : AUDIT_ACTION;
           e->type = BPRM_TYPE;
           e->mnt_ns = mnt_ns;
           e->tgid = bpf_get_current_pid_tgid()>>32;
@@ -63,7 +63,7 @@ static __noinline int iterate_bprm_inner_map_for_executable(u32 *vbprm_inner, st
         }
       }
 
-      if (rule->mode & ENFORCE_MODE) {
+      if (rule->mode & DENY_MODE) {
         DEBUG_PRINT("access denied");
         return -EPERM;
       }

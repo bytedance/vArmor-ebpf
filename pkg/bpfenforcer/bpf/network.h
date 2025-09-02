@@ -162,7 +162,7 @@ static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, 
           e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
           if (e) {
             DEBUG_PRINT("write audit event to ringbuf");
-            e->mode = rule->mode;
+            e->action = rule->mode & DENY_MODE ? DENIED_ACTION : AUDIT_ACTION;
             e->type = NETWORK_TYPE;
             e->mnt_ns = mnt_ns;
             e->tgid = bpf_get_current_pid_tgid()>>32;
@@ -175,7 +175,7 @@ static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, 
           }
         }
 
-        if (rule->mode & ENFORCE_MODE) {
+        if (rule->mode & DENY_MODE) {
           DEBUG_PRINT("access denied");
           return -EPERM;
         }
@@ -249,7 +249,7 @@ static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, 
           e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
           if (e) {
             DEBUG_PRINT("write audit event to ringbuf");
-            e->mode = rule->mode;
+            e->action = rule->mode & DENY_MODE ? DENIED_ACTION : AUDIT_ACTION;
             e->type = NETWORK_TYPE;
             e->mnt_ns = mnt_ns;
             e->tgid = bpf_get_current_pid_tgid()>>32;
@@ -262,7 +262,7 @@ static __noinline int iterate_net_inner_map_for_socket_connect(u32 *vnet_inner, 
           }
         }
 
-        if (rule->mode & ENFORCE_MODE) {
+        if (rule->mode & DENY_MODE) {
           DEBUG_PRINT("access denied");
           return -EPERM;
         }
@@ -316,7 +316,7 @@ static __noinline int iterate_net_inner_map_for_socket_create(u32 *vnet_inner, s
       e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
       if (e) {
         DEBUG_PRINT("write audit event to ringbuf");
-          e->mode = rule->mode;
+          e->action = rule->mode & DENY_MODE ? DENIED_ACTION : AUDIT_ACTION;
           e->type = NETWORK_TYPE;
           e->mnt_ns = mnt_ns;
           e->tgid = bpf_get_current_pid_tgid()>>32;
@@ -329,7 +329,7 @@ static __noinline int iterate_net_inner_map_for_socket_create(u32 *vnet_inner, s
       }
     }
 
-    if (rule->mode & ENFORCE_MODE) {
+    if (rule->mode & DENY_MODE) {
       DEBUG_PRINT("access denied");
       return -EPERM;
     }
