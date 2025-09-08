@@ -165,7 +165,7 @@ struct v_network {
 };
 
 struct v_ptrace {
-  u32 permissions;
+  u32 permission;
   bool external;
 };
 

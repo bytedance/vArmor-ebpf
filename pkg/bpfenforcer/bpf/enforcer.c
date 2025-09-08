@@ -616,7 +616,7 @@ int BPF_PROG(varmor_ptrace_access_check, struct task_struct *child, unsigned int
         e->mnt_ns = current_mnt_ns;
         e->tgid = bpf_get_current_pid_tgid()>>32;
         e->ktime = bpf_ktime_get_boot_ns();
-        e->event_u.ptrace.permissions = (mode & PTRACE_MODE_READ) ? AA_PTRACE_READ : AA_PTRACE_TRACE;
+        e->event_u.ptrace.permission = (mode & PTRACE_MODE_READ) ? AA_PTRACE_READ : AA_PTRACE_TRACE;
         e->event_u.ptrace.external = (current_mnt_ns != child_mnt_ns);
         bpf_ringbuf_submit(e, 0);
       }
@@ -637,7 +637,7 @@ int BPF_PROG(varmor_ptrace_access_check, struct task_struct *child, unsigned int
               e->mnt_ns = current_mnt_ns;
               e->tgid = bpf_get_current_pid_tgid()>>32;
               e->ktime = bpf_ktime_get_boot_ns();
-              e->event_u.ptrace.permissions = (mode & PTRACE_MODE_READ) ? AA_PTRACE_READ : AA_PTRACE_TRACE;
+              e->event_u.ptrace.permission = (mode & PTRACE_MODE_READ) ? AA_PTRACE_READ : AA_PTRACE_TRACE;
               e->event_u.ptrace.external = (current_mnt_ns != child_mnt_ns);
               bpf_ringbuf_submit(e, 0);
             }
@@ -666,7 +666,7 @@ int BPF_PROG(varmor_ptrace_access_check, struct task_struct *child, unsigned int
         e->mnt_ns = child_mnt_ns;
         e->tgid = bpf_get_current_pid_tgid()>>32;
         e->ktime = bpf_ktime_get_boot_ns();
-        e->event_u.ptrace.permissions = (mode & PTRACE_MODE_READ) ? AA_MAY_BE_READ : AA_MAY_BE_TRACED;
+        e->event_u.ptrace.permission = (mode & PTRACE_MODE_READ) ? AA_MAY_BE_READ : AA_MAY_BE_TRACED;
         e->event_u.ptrace.external = (current_mnt_ns != child_mnt_ns);
         bpf_ringbuf_submit(e, 0);
       }
@@ -687,7 +687,7 @@ int BPF_PROG(varmor_ptrace_access_check, struct task_struct *child, unsigned int
               e->mnt_ns = child_mnt_ns;
               e->tgid = bpf_get_current_pid_tgid()>>32;
               e->ktime = bpf_ktime_get_boot_ns();
-              e->event_u.ptrace.permissions = (mode & PTRACE_MODE_READ) ? AA_MAY_BE_READ : AA_MAY_BE_TRACED;
+              e->event_u.ptrace.permission = (mode & PTRACE_MODE_READ) ? AA_MAY_BE_READ : AA_MAY_BE_TRACED;
               e->event_u.ptrace.external = (current_mnt_ns != child_mnt_ns);
               bpf_ringbuf_submit(e, 0);
             }
@@ -800,7 +800,6 @@ int BPF_PROG(varmor_move_mount, struct path *from_path, struct path *to_path) {
   // since v5.2. See https://lwn.net/Articles/759499/ 
   // We only care about the relocation use case of move_mount() for now, and
   // reuse the rules for mount().
-  unsigned long mock_flags = MS_MOVE;
   buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX] = 'n';
   buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+1] = 'o';
   buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+2] = 'n';
@@ -812,7 +811,7 @@ int BPF_PROG(varmor_move_mount, struct path *from_path, struct path *to_path) {
       &(buf->value[offset.first_path & (PATH_MAX-1)]), PATH_MAX-offset.first_path-1, offset.first_path);
   DEBUG_PRINT("from name: %s, length: %d", &(buf->value[PATH_MAX*2]), offset.first_name);
   DEBUG_PRINT("mock fstype: %s", &(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX]));
-  DEBUG_PRINT("mock flags: 0x%x", mock_flags);
+  DEBUG_PRINT("mock flags: 0x%x", MS_MOVE);
 
   if (*profile_mode == COMPLAIN_MODE) {
     // Record the behavior to the ringbuf
@@ -827,7 +826,7 @@ int BPF_PROG(varmor_move_mount, struct path *from_path, struct path *to_path) {
       e->ktime = bpf_ktime_get_boot_ns();
       bpf_probe_read_kernel_str(e->event_u.mount.path, (PATH_MAX-offset.first_path) & (PATH_MAX-1), &(buf->value[offset.first_path & (PATH_MAX-1)]));
       bpf_probe_read_kernel_str(e->event_u.mount.type, FILE_SYSTEM_TYPE_MAX, &(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX]));
-      e->event_u.mount.flags = mock_flags;
+      e->event_u.mount.flags = MS_MOVE;
       bpf_ringbuf_submit(e, 0);
     }
     return 0;
@@ -838,7 +837,7 @@ int BPF_PROG(varmor_move_mount, struct path *from_path, struct path *to_path) {
       return 0;
 
     // Iterate all rules in the inner map
-    return iterate_mount_inner_map_extra(vmount_inner, mock_flags, buf, &offset, mnt_ns);
+    return iterate_mount_inner_map_extra(vmount_inner, MS_MOVE, buf, &offset, mnt_ns);
   } else {
     return 0;
   }
@@ -868,7 +867,6 @@ int BPF_PROG(varmor_umount, struct vfsmount *mnt, int flags) {
 
   // Mock flags and fstype
   // Linux mount-flags do not use the value 0x200, so we use it to identify umount
-  unsigned long mock_flags = AA_MAY_UMOUNT;
   buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX] = 'n';
   buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+1] = 'o';
   buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX+2] = 'n';
@@ -880,7 +878,7 @@ int BPF_PROG(varmor_umount, struct vfsmount *mnt, int flags) {
       &(buf->value[offset.first_path & (PATH_MAX-1)]), PATH_MAX-offset.first_path-1, offset.first_path);
   DEBUG_PRINT("umount name: %s, length: %d", &(buf->value[PATH_MAX*2]), offset.first_name);
   DEBUG_PRINT("mock fstype: %s", &(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX]));
-  DEBUG_PRINT("mock flags: 0x%x", mock_flags);
+  DEBUG_PRINT("mock flags: 0x%x", AA_MAY_UMOUNT);
 
   if (*profile_mode == COMPLAIN_MODE) {
     // Record the behavior to the ringbuf
@@ -895,7 +893,7 @@ int BPF_PROG(varmor_umount, struct vfsmount *mnt, int flags) {
       e->ktime = bpf_ktime_get_boot_ns();
       bpf_probe_read_kernel_str(e->event_u.mount.path, (PATH_MAX-offset.first_path) & (PATH_MAX-1), &(buf->value[offset.first_path & (PATH_MAX-1)]));
       bpf_probe_read_kernel_str(e->event_u.mount.type, FILE_SYSTEM_TYPE_MAX, &(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX]));
-      e->event_u.mount.flags = mock_flags;
+      e->event_u.mount.flags = AA_MAY_UMOUNT;
       bpf_ringbuf_submit(e, 0);
     }
     return 0;
@@ -906,7 +904,7 @@ int BPF_PROG(varmor_umount, struct vfsmount *mnt, int flags) {
       return 0;
 
     // Iterate all rules in the inner map
-    return iterate_mount_inner_map_extra(vmount_inner, mock_flags, buf, &offset, mnt_ns);
+    return iterate_mount_inner_map_extra(vmount_inner, AA_MAY_UMOUNT, buf, &offset, mnt_ns);
   } else {
     return 0;
   }

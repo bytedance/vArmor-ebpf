@@ -88,8 +88,8 @@ type bpfNetworkEvent struct {
 }
 
 type bpfPtraceEvent struct {
-	Permissions uint32
-	External    bool
+	Permission uint32
+	External   bool
 }
 
 type bpfMountEvent struct {

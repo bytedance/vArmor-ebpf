@@ -556,7 +556,7 @@ func (enforcer *BpfEnforcer) ReadFromAuditEventRingBuf(ringbufMap *ebpf.Map) err
 				fmt.Println(err)
 			}
 
-			fmt.Println("Permissions:", ptracePermissionMap[event.Permissions])
+			fmt.Println("Permission:", ptracePermissionMap[event.Permission])
 			fmt.Println("Externel:", event.External)
 
 		case MountType:
