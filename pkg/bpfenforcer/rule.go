@@ -23,7 +23,7 @@ import (
 	"github.com/dlclark/regexp2"
 )
 
-func newBpfCapabilityRule(mode uint32, capabilities uint64) (*bpfCapabilityRule, error) {
+func NewBpfCapabilityRule(mode uint32, capabilities uint64) (*bpfCapabilityRule, error) {
 	var capabilityRule bpfCapabilityRule
 	capabilityRule.Mode = mode
 	capabilityRule.Caps = capabilities
@@ -51,7 +51,7 @@ func regexp2FindAllString(re *regexp2.Regexp, s string) []string {
 	return matches
 }
 
-func newBpfPathRule(mode uint32, pattern string, permissions uint32) (*bpfPathRule, error) {
+func NewBpfPathRule(mode uint32, pattern string, permissions uint32) (*bpfPathRule, error) {
 	// Pre-check
 	re, err := regexp2.Compile(`(?<!\*)\*(?!\*)`, regexp2.None)
 	if err != nil {
@@ -129,7 +129,7 @@ func newBpfPathRule(mode uint32, pattern string, permissions uint32) (*bpfPathRu
 	return &pathRule, nil
 }
 
-func newBpfNetworkConnectRule(mode uint32, cidr string, ipAddress string, port uint16, endPort uint16, ports *[]uint16) (*bpfNetworkRule, error) {
+func NewBpfNetworkConnectRule(mode uint32, cidr string, ipAddress string, port uint16, endPort uint16, ports *[]uint16) (*bpfNetworkRule, error) {
 	// Pre-check
 	if cidr == "" && ipAddress == "" && port == 0 && endPort == 0 && ports == nil {
 		return nil, fmt.Errorf("cidr, ipAddress, port, endPort and ports cannot be empty at the same time")
@@ -221,7 +221,7 @@ func newBpfNetworkConnectRule(mode uint32, cidr string, ipAddress string, port u
 	return &networkRule, nil
 }
 
-func newBpfNetworkCreateRule(mode uint32, domains uint64, types uint64, protocols uint64) (*bpfNetworkRule, error) {
+func NewBpfNetworkCreateRule(mode uint32, domains uint64, types uint64, protocols uint64) (*bpfNetworkRule, error) {
 	if types != 0 && protocols != 0 {
 		return nil, fmt.Errorf("types and protocols cannot be set at the same time")
 	}
@@ -238,7 +238,7 @@ func newBpfNetworkCreateRule(mode uint32, domains uint64, types uint64, protocol
 	}, nil
 }
 
-func newBpfPtraceRule(mode uint32, permissions uint32, flags uint32) (*bpfPtraceRule, error) {
+func NewBpfPtraceRule(mode uint32, permissions uint32, flags uint32) (*bpfPtraceRule, error) {
 	return &bpfPtraceRule{
 		Mode:        mode,
 		Permissions: permissions,
@@ -246,7 +246,7 @@ func newBpfPtraceRule(mode uint32, permissions uint32, flags uint32) (*bpfPtrace
 	}, nil
 }
 
-func newBpfMountRule(mode uint32, sourcePattern string, fstype string, mountFlags uint32, reverseMountFlags uint32) (*bpfMountRule, error) {
+func NewBpfMountRule(mode uint32, sourcePattern string, fstype string, mountFlags uint32, reverseMountFlags uint32) (*bpfMountRule, error) {
 	// Pre-check
 	if len(fstype) >= MaxFileSystemTypeLength {
 		return nil, fmt.Errorf("the length of fstype '%s' should be less than the maximum (%d)", fstype, MaxFileSystemTypeLength)

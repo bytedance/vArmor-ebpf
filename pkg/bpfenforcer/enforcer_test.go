@@ -52,7 +52,7 @@ func Test_enforcing(t *testing.T) {
 	defer e.StopEnforcing()
 }
 
-func TestEnforcement(t *testing.T) {
+func Test_Enforcement(t *testing.T) {
 	testCases := []struct {
 		name          string
 		ruleSetup     func(*BpfEnforcer, uint32) error
@@ -64,7 +64,7 @@ func TestEnforcement(t *testing.T) {
 		{
 			name: "Block CAP_NET_RAW",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
-				capRule, err := newBpfCapabilityRule(EnforceMode|AuditMode, 1<<unix.CAP_NET_RAW)
+				capRule, err := NewBpfCapabilityRule(DenyMode|AuditMode, 1<<unix.CAP_NET_RAW)
 				assert.NilError(t, err)
 				return e.SetCapableMap(id, capRule)
 			},
@@ -78,7 +78,7 @@ func TestEnforcement(t *testing.T) {
 		{
 			name: "Block CAP_SYS_ADMIN",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
-				capRule, err := newBpfCapabilityRule(EnforceMode|AuditMode, 1<<unix.CAP_SYS_ADMIN)
+				capRule, err := NewBpfCapabilityRule(DenyMode|AuditMode, 1<<unix.CAP_SYS_ADMIN)
 				assert.NilError(t, err)
 				return e.SetCapableMap(id, capRule)
 			},
@@ -93,7 +93,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block IP: 11.30.31.68    PORT: 6443",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "11.30.31.68", 6443, 0, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", "11.30.31.68", 6443, 0, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -109,7 +109,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block CIDR: 192.168.1.0/24",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "192.168.1.0/24", "", 0, 0, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "192.168.1.0/24", "", 0, 0, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -125,7 +125,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block CIDR: 172.16.0.0/11 (Allow 172.32.1.101)", // 172.31.0.1 and 172.32.0.1
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "172.16.0.0/11", "", 0, 0, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "172.16.0.0/11", "", 0, 0, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -141,7 +141,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block IP: fdbd:dc01:ff:307:9329:268d:3a27:2ca7",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "fdbd:dc01:ff:307:9329:268d:3a27:2ca7", 0, 0, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", "fdbd:dc01:ff:307:9329:268d:3a27:2ca7", 0, 0, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -157,7 +157,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block CIDR: 2001:db8::/31", // 2001:db8:1:: and 2001:dba:1::
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "2001:db8::/31", "", 0, 0, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "2001:db8::/31", "", 0, 0, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -173,7 +173,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block CIDR: 2001:db8::/31 (Allow 2001:dba:2:307:9329:268d:3a27:2ca7 )", // 2001:db8:1:: and 2001:dba:1::
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "2001:db8::/31", "", 0, 0, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "2001:db8::/31", "", 0, 0, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -189,7 +189,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block IP: *    PORT: 10250 (IPv4)",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "", 10250, 0, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", "", 10250, 0, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -205,7 +205,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block IP: *    PORT: 10250 (IPv6)",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "", 10250, 0, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", "", 10250, 0, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -221,7 +221,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block IP: *    PORT: 10250 (Allow 127.0.0.1:18898)",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "", 10250, 0, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", "", 10250, 0, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -237,7 +237,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block IP: *    PORT: 10250 (Allow [::1]:18898)",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "", 10250, 0, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", "", 10250, 0, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -253,7 +253,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block IP: *    PORT: 6670-6680",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "", 6670, 6680, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", "", 6670, 6680, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -269,7 +269,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block IP: *    PORT: 6670-6680 (Allow :6681)",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "", 6670, 6680, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", "", 6670, 6680, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -285,7 +285,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block IP: *    PORT: 6670,6672,6673",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "", 0, 0, &[]uint16{6670, 6672, 6673})
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", "", 0, 0, &[]uint16{6670, 6672, 6673})
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -301,7 +301,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block IP: *    PORT: 6670,6672,6673 (Allow :6671)",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "", 0, 0, &[]uint16{6670, 6672, 6673})
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", "", 0, 0, &[]uint16{6670, 6672, 6673})
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -321,7 +321,7 @@ func TestEnforcement(t *testing.T) {
 				assert.NilError(t, err)
 
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -341,7 +341,7 @@ func TestEnforcement(t *testing.T) {
 				assert.NilError(t, err)
 
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -361,7 +361,7 @@ func TestEnforcement(t *testing.T) {
 				assert.NilError(t, err)
 
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -381,7 +381,7 @@ func TestEnforcement(t *testing.T) {
 				assert.NilError(t, err)
 
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -401,7 +401,7 @@ func TestEnforcement(t *testing.T) {
 				assert.NilError(t, err)
 
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -421,7 +421,7 @@ func TestEnforcement(t *testing.T) {
 				assert.NilError(t, err)
 
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 0, 0, &[]uint16{80, 8080})
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", PodSelfIP, 0, 0, &[]uint16{80, 8080})
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -441,7 +441,7 @@ func TestEnforcement(t *testing.T) {
 				assert.NilError(t, err)
 
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -461,7 +461,7 @@ func TestEnforcement(t *testing.T) {
 				assert.NilError(t, err)
 
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -477,7 +477,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block IPv4 '0.0.0.0':'80-8080'",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", Unspecified, 80, 8080, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", Unspecified, 80, 8080, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -493,7 +493,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block IPv4 '0.0.0.0':'80-8080'",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", Unspecified, 80, 8080, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", Unspecified, 80, 8080, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -509,7 +509,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block IPv4 '0.0.0.0':'80-8080' (Allow '0.0.0.0':'9090')",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", Unspecified, 80, 8080, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", Unspecified, 80, 8080, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -525,7 +525,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block IPv4 '0.0.0.0':'80-8080' (Allow '127.0.0.1':'80')",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", Unspecified, 80, 8080, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", Unspecified, 80, 8080, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -541,7 +541,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block IPv6 '::':'80-8080'",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", Unspecified, 80, 8080, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", Unspecified, 80, 8080, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -557,7 +557,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block IPv6 '::':'80-8080'",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", Unspecified, 80, 8080, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", Unspecified, 80, 8080, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -573,7 +573,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block IPv6 '::':'80-8080' (Allow '::':'9090')",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", Unspecified, 80, 8080, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", Unspecified, 80, 8080, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -589,7 +589,7 @@ func TestEnforcement(t *testing.T) {
 			name: "Block IPv6 '::':'80-8080' (Allow '::1':'80')",
 			ruleSetup: func(e *BpfEnforcer, id uint32) error {
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", Unspecified, 80, 8080, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", Unspecified, 80, 8080, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -609,7 +609,7 @@ func TestEnforcement(t *testing.T) {
 				assert.NilError(t, err)
 
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -629,7 +629,7 @@ func TestEnforcement(t *testing.T) {
 				assert.NilError(t, err)
 
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -649,7 +649,7 @@ func TestEnforcement(t *testing.T) {
 				assert.NilError(t, err)
 
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -669,7 +669,7 @@ func TestEnforcement(t *testing.T) {
 				assert.NilError(t, err)
 
 				var rules []bpfNetworkRule
-				rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
+				rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", PodSelfIP, 80, 8080, nil)
 				assert.NilError(t, err)
 				rules = append(rules, *rule)
 				return e.SetNetMap(id, rules)
@@ -704,6 +704,9 @@ func TestEnforcement(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			err = e.SetProfileMode(nsID, EnforceMode)
+			assert.NilError(t, err)
+
 			if err := tc.ruleSetup(e, nsID); err != nil {
 				t.Fatal(err)
 			}
@@ -732,9 +735,12 @@ func Test_VarmorCapable(t *testing.T) {
 	assert.NilError(t, err)
 	defer e.StopEnforcing()
 
+	err = e.SetProfileMode(4026532792, EnforceMode)
+	assert.NilError(t, err)
+
 	// CAP_SYS_ADMIN: unshare -Urn
 	// CAP_NET_RAW: ping 127.0.0.1
-	capRule, _ := newBpfCapabilityRule(EnforceMode|AuditMode, 1<<unix.CAP_NET_RAW|1<<unix.CAP_SYS_ADMIN)
+	capRule, _ := NewBpfCapabilityRule(DenyMode|AuditMode, 1<<unix.CAP_NET_RAW|1<<unix.CAP_SYS_ADMIN)
 	err = e.SetCapableMap(4026532792, capRule)
 	assert.NilError(t, err)
 
@@ -851,7 +857,7 @@ func Test_newBpfPathRule(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.pattern, func(t *testing.T) {
-			rule, err := newBpfPathRule(EnforceMode, tc.pattern, tc.permission)
+			rule, err := NewBpfPathRule(DenyMode, tc.pattern, tc.permission)
 			if err != nil {
 				assert.Equal(t, err.Error(), tc.expectedErr.Error())
 			} else {
@@ -876,12 +882,15 @@ func Test_VarmorFileRule(t *testing.T) {
 	assert.NilError(t, err)
 	defer e.StopEnforcing()
 
-	// host mnt ns id: 4026531840
-	// match /tmp/33**, /**/33, /tmp/**/33, /etc/**,
-	rule, err := newBpfPathRule(EnforceMode|AuditMode, "/**/hostname", AaMayWrite|AaMayAppend)
+	err = e.SetProfileMode(4026533472, EnforceMode)
 	assert.NilError(t, err)
 
-	err = e.SetFileMap(4026532792, rule)
+	// host mnt ns id: 4026531840
+	// match /tmp/33**, /**/33, /tmp/**/33, /etc/**,
+	rule, err := NewBpfPathRule(DenyMode|AuditMode, "/**/hostname", AaMayWrite|AaMayAppend)
+	assert.NilError(t, err)
+
+	err = e.SetFileMap(4026533472, rule)
 	assert.NilError(t, err)
 
 	go e.ReadFromAuditEventRingBuf(e.objs.V_auditRb)
@@ -905,7 +914,10 @@ func Test_VarmorBprmCheckSecurity(t *testing.T) {
 	assert.NilError(t, err)
 	defer e.StopEnforcing()
 
-	rule, err := newBpfPathRule(EnforceMode|AuditMode, "/bin/**ng", AaMayExec)
+	err = e.SetProfileMode(4026532792, EnforceMode)
+	assert.NilError(t, err)
+
+	rule, err := NewBpfPathRule(DenyMode|AuditMode, "/bin/**ng", AaMayExec)
 	assert.NilError(t, err)
 
 	err = e.SetBprmMap(4026532792, rule)
@@ -1071,7 +1083,7 @@ func Test_newBpfNetworkConnectRule(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, tc.cidr, tc.address, tc.port, tc.endPort, tc.ports)
+			rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, tc.cidr, tc.address, tc.port, tc.endPort, tc.ports)
 			if err != nil {
 				assert.Equal(t, err.Error(), tc.expectedErr.Error())
 			} else {
@@ -1107,35 +1119,38 @@ func Test_VarmorNetworkConnectSecurity(t *testing.T) {
 
 	var rules []bpfNetworkRule
 
-	rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "11.30.31.68", 6443, 0, nil)
+	rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "", "11.30.31.68", 6443, 0, nil)
 	assert.NilError(t, err)
 	rules = append(rules, *rule)
 
 	// CIDR: 172.0.0.0/11 (172.0.0.0 ~ 172.31.255.255) test with 172.31.0.1 and 172.32.0.1
-	rule, err = newBpfNetworkConnectRule(EnforceMode|AuditMode, "172.16.0.0/11", "", 0, 0, nil)
+	rule, err = NewBpfNetworkConnectRule(DenyMode|AuditMode, "172.16.0.0/11", "", 0, 0, nil)
 	assert.NilError(t, err)
 	rules = append(rules, *rule)
 
-	rule, err = newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "fdbd:dc01:ff:307:9329:268d:3a27:2ca7", 0, 0, nil)
+	rule, err = NewBpfNetworkConnectRule(DenyMode|AuditMode, "", "fdbd:dc01:ff:307:9329:268d:3a27:2ca7", 0, 0, nil)
 	assert.NilError(t, err)
 	rules = append(rules, *rule)
 
 	// CIDR: 2001:db8::/31 (2001:db8:: ~ 2001:db9:ffff:ffff:ffff:ffff:ffff:ffff ) test with 2001:db8:1:: and 2001:dba:1::
-	rule, err = newBpfNetworkConnectRule(EnforceMode|AuditMode, "2001:db8::/31", "", 0, 0, nil)
+	rule, err = NewBpfNetworkConnectRule(DenyMode|AuditMode, "2001:db8::/31", "", 0, 0, nil)
 	assert.NilError(t, err)
 	rules = append(rules, *rule)
 
-	rule, err = newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "", 10250, 0, nil)
+	rule, err = NewBpfNetworkConnectRule(DenyMode|AuditMode, "", "", 10250, 0, nil)
 	assert.NilError(t, err)
 	rules = append(rules, *rule)
 
-	rule, err = newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "", 10250, 10255, nil)
+	rule, err = NewBpfNetworkConnectRule(DenyMode|AuditMode, "", "", 10250, 10255, nil)
 	assert.NilError(t, err)
 	rules = append(rules, *rule)
 
-	rule, err = newBpfNetworkConnectRule(EnforceMode|AuditMode, "", "", 0, 0, &[]uint16{80, 8080, 8060})
+	rule, err = NewBpfNetworkConnectRule(DenyMode|AuditMode, "", "", 0, 0, &[]uint16{80, 8080, 8060})
 	assert.NilError(t, err)
 	rules = append(rules, *rule)
+
+	err = e.SetProfileMode(4026533644, EnforceMode)
+	assert.NilError(t, err)
 
 	err = e.SetNetMap(4026533644, rules)
 	assert.NilError(t, err)
@@ -1163,16 +1178,19 @@ func Test_VarmorNetworkCreateSecurity(t *testing.T) {
 
 	var rules []bpfNetworkRule
 
-	rule, err := newBpfNetworkConnectRule(EnforceMode|AuditMode, "192.168.1.0/24", "", 0, 0, nil)
+	rule, err := NewBpfNetworkConnectRule(DenyMode|AuditMode, "192.168.1.0/24", "", 0, 0, nil)
 	assert.NilError(t, err)
 	rules = append(rules, *rule)
 
-	rule, err = newBpfNetworkCreateRule(EnforceMode|AuditMode,
+	rule, err = NewBpfNetworkCreateRule(DenyMode|AuditMode,
 		0,
 		0,
 		1<<unix.IPPROTO_ICMP|1<<unix.IPPROTO_ICMPV6)
 	assert.NilError(t, err)
 	rules = append(rules, *rule)
+
+	err = e.SetProfileMode(4026533501, EnforceMode)
+	assert.NilError(t, err)
 
 	err = e.SetNetMap(4026533501, rules)
 	assert.NilError(t, err)
@@ -1198,7 +1216,11 @@ func Test_VarmorPtraceAccessCheck(t *testing.T) {
 	assert.NilError(t, err)
 	defer e.StopEnforcing()
 
-	rule, _ := newBpfPtraceRule(EnforceMode|AuditMode, AaMayBeRead, GreedyMatch)
+	rule, _ := NewBpfPtraceRule(DenyMode|AuditMode, AaMayBeRead, GreedyMatch)
+
+	err = e.SetProfileMode(4026532792, EnforceMode)
+	assert.NilError(t, err)
+
 	err = e.SetPtraceMap(4026532792, rule)
 	assert.NilError(t, err)
 
@@ -1223,7 +1245,10 @@ func Test_VarmorBindMountAccessCheck(t *testing.T) {
 	assert.NilError(t, err)
 	defer e.StopEnforcing()
 
-	rule, err := newBpfMountRule(EnforceMode|AuditMode, "/proc**", "none", unix.MS_BIND, 0)
+	rule, err := NewBpfMountRule(DenyMode|AuditMode, "/proc**", "none", unix.MS_BIND, 0)
+	assert.NilError(t, err)
+
+	err = e.SetProfileMode(4026532792, EnforceMode)
 	assert.NilError(t, err)
 
 	err = e.SetMountMap(4026532792, rule)
@@ -1255,10 +1280,37 @@ func Test_VarmorMountNewProcAccessCheck(t *testing.T) {
 		unix.MS_PRIVATE &^ unix.MS_SLAVE &^
 		unix.MS_UNBINDABLE &^ unix.MS_MOVE &^ AaMayUmount
 
-	rule, err := newBpfMountRule(EnforceMode|AuditMode, "**", "proc", uint32(flags), 0xFFFFFFFF)
+	rule, err := NewBpfMountRule(DenyMode|AuditMode, "**", "proc", uint32(flags), 0xFFFFFFFF)
+	assert.NilError(t, err)
+
+	err = e.SetProfileMode(4026532792, EnforceMode)
 	assert.NilError(t, err)
 
 	err = e.SetMountMap(4026532792, rule)
+	assert.NilError(t, err)
+
+	go e.ReadFromAuditEventRingBuf(e.objs.V_auditRb)
+
+	stopTicker := time.NewTicker(5 * time.Second)
+	<-stopTicker.C
+
+	// err = fmt.Errorf("forced error")
+	// assert.NilError(t, err)
+}
+
+func Test_VarmorComplain(t *testing.T) {
+	c := textlogger.NewConfig()
+	log.SetLogger(textlogger.NewLogger(c))
+	e := NewBpfEnforcer(log.Log.WithName("ebpf"))
+	err := e.InitEBPF()
+	assert.NilError(t, err)
+	defer e.RemoveEBPF()
+
+	err = e.StartEnforcing()
+	assert.NilError(t, err)
+	defer e.StopEnforcing()
+
+	err = e.SetProfileMode(4026533839, ComplainMode)
 	assert.NilError(t, err)
 
 	go e.ReadFromAuditEventRingBuf(e.objs.V_auditRb)

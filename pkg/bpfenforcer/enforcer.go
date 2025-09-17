@@ -289,6 +289,14 @@ func (enforcer *BpfEnforcer) StopEnforcing() {
 	enforcer.umountLink.Close()
 }
 
+func (enforcer *BpfEnforcer) SetProfileMode(mntNsID uint32, profileMode uint32) error {
+	return enforcer.objs.V_profileMode.Put(&mntNsID, profileMode)
+}
+
+func (enforcer *BpfEnforcer) ClearProfileMode(mntNsID uint32) error {
+	return enforcer.objs.V_profileMode.Delete(&mntNsID)
+}
+
 func (enforcer *BpfEnforcer) SetCapableMap(mntNsID uint32, capabilityRule *bpfCapabilityRule) error {
 	return enforcer.objs.V_capable.Put(&mntNsID, capabilityRule)
 }
@@ -462,7 +470,7 @@ func (enforcer *BpfEnforcer) ReadFromAuditEventRingBuf(ringbufMap *ebpf.Map) err
 			fmt.Printf("[!] Reading from reader: %s", err)
 			break
 		}
-		fmt.Println("[+] The minimum number of bytes remaining in the ring buffer:", record.Remaining)
+		fmt.Println("\n[+] The minimum number of bytes remaining in the ring buffer:", record.Remaining)
 
 		// Parse the header of audit event
 		if err := binary.Read(bytes.NewBuffer(record.RawSample[:EventHeaderSize]), binary.LittleEndian, &eventHeader); err != nil {
@@ -471,90 +479,111 @@ func (enforcer *BpfEnforcer) ReadFromAuditEventRingBuf(ringbufMap *ebpf.Map) err
 		}
 
 		// Process the body of audit event
-		if eventHeader.Mode&AuditMode == AuditMode {
-			fmt.Println("PID:", eventHeader.Tgid)
-			fmt.Println("Ktime:", eventHeader.Ktime)
-			fmt.Println("Mount Namespace ID:", eventHeader.MntNs)
-			switch eventHeader.Type {
-			case CapabilityType:
-				// Parse the event body of capability
-				var event bpfCapabilityEvent
-				err := binary.Read(bytes.NewBuffer(record.RawSample[EventHeaderSize:]), binary.LittleEndian, &event)
-				if err != nil {
-					fmt.Println(err)
-				}
-
-				fmt.Printf("Capability: 0x%x\n", event.Capability)
-
-			case FileType:
-				// Parse the event body of file operation
-				var event bpfPathEvent
-				err := binary.Read(bytes.NewBuffer(record.RawSample[EventHeaderSize:]), binary.LittleEndian, &event)
-				if err != nil {
-					fmt.Println(err)
-				}
-
-				fmt.Printf("Permissions: 0x%x\n", event.Permissions)
-				fmt.Println("Path:", unix.ByteSliceToString(event.Path[:]))
-
-			case BprmType:
-				// Parse the event body of execution file
-				var event bpfPathEvent
-				err := binary.Read(bytes.NewBuffer(record.RawSample[EventHeaderSize:]), binary.LittleEndian, &event)
-				if err != nil {
-					fmt.Println(err)
-				}
-
-				fmt.Printf("Permissions: 0x%x\n", event.Permissions)
-				fmt.Println("Path:", unix.ByteSliceToString(event.Path[:]))
-
-			case NetworkType:
-				// Parse the event body of network egress
-				var event bpfNetworkEvent
-				err := binary.Read(bytes.NewBuffer(record.RawSample[EventHeaderSize:]), binary.LittleEndian, &event)
-				if err != nil {
-					fmt.Println(err)
-				}
-
-				switch event.Type {
-				case ConnectType:
-					if event.Addr.SaFamily == unix.AF_INET {
-						ip := net.IPv4(byte(event.Addr.SinAddr), byte(event.Addr.SinAddr>>8), byte(event.Addr.SinAddr>>16), byte(event.Addr.SinAddr>>24))
-						fmt.Println("Egress IPv4 address:", ip.String())
-					} else {
-						ip := net.IP(event.Addr.Sin6Addr[:])
-						fmt.Println("Egress IPv6 address:", ip.String())
-					}
-					fmt.Println("Egress Port:", event.Addr.Port)
-				case SocketType:
-					fmt.Println("Socket Domain", event.Socket.Domain)
-					fmt.Println("Socket Type", event.Socket.Type)
-					fmt.Println("Socket Protocol", event.Socket.Protocol)
-				}
-
-			case PtraceType:
-				// Parse the event body of ptrace operation
-				var event bpfPtraceEvent
-				err := binary.Read(bytes.NewBuffer(record.RawSample[EventHeaderSize:]), binary.LittleEndian, &event)
-				if err != nil {
-					fmt.Println(err)
-				}
-
-				fmt.Println("Permissions:", event.Permissions)
-				fmt.Println("Externel:", event.External)
-
-			case MountType:
-				// Parse the event body of mount operation
-				var event bpfMountEvent
-				err := binary.Read(bytes.NewBuffer(record.RawSample[EventHeaderSize:]), binary.LittleEndian, &event)
-				if err != nil {
-					fmt.Println(err)
-				}
-
-				fmt.Println("Device Name:", unix.ByteSliceToString(event.DevName[:]))
-				fmt.Println("FileSystem Type:", unix.ByteSliceToString(event.Type[:]))
-				fmt.Println("Flags:", event.Flags)
+		fmt.Println("Action:", EnforcementActionMap[eventHeader.Action])
+		fmt.Println("Event Type:", EventTypeMap[eventHeader.Type])
+		fmt.Println("Mount Namespace ID:", eventHeader.MntNs)
+		fmt.Println("PID:", eventHeader.Tgid)
+		fmt.Println("Ktime:", eventHeader.Ktime)
+		switch eventHeader.Type {
+		case CapabilityType:
+			// Parse the event body of capability
+			var event bpfCapabilityEvent
+			err := binary.Read(bytes.NewBuffer(record.RawSample[EventHeaderSize:]), binary.LittleEndian, &event)
+			if err != nil {
+				fmt.Println(err)
 			}
+
+			fmt.Println("Capability:", CapabilityMap[event.Capability])
+
+		case FileType:
+			// Parse the event body of file operation
+			var event bpfPathEvent
+			err := binary.Read(bytes.NewBuffer(record.RawSample[EventHeaderSize:]), binary.LittleEndian, &event)
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			permissions := []string{}
+			for perm, name := range PathPermissionMap {
+				if event.Permissions&perm != 0 {
+					permissions = append(permissions, name)
+				}
+			}
+
+			fmt.Println("Permissions:", permissions)
+			fmt.Println("Path:", unix.ByteSliceToString(event.Path[:]))
+
+		case BprmType:
+			// Parse the event body of execution file
+			var event bpfPathEvent
+			err := binary.Read(bytes.NewBuffer(record.RawSample[EventHeaderSize:]), binary.LittleEndian, &event)
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			fmt.Println("Permissions:", []string{PathPermissionMap[event.Permissions]})
+			fmt.Println("Path:", unix.ByteSliceToString(event.Path[:]))
+
+		case NetworkType:
+			// Parse the event body of network egress
+			var event bpfNetworkEvent
+			err := binary.Read(bytes.NewBuffer(record.RawSample[EventHeaderSize:]), binary.LittleEndian, &event)
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			switch event.Type {
+			case ConnectType:
+				if event.Addr.SaFamily == unix.AF_INET {
+					ip := net.IPv4(byte(event.Addr.SinAddr), byte(event.Addr.SinAddr>>8), byte(event.Addr.SinAddr>>16), byte(event.Addr.SinAddr>>24))
+					fmt.Println("Egress IPv4 address:", ip.String())
+				} else {
+					ip := net.IP(event.Addr.Sin6Addr[:])
+					fmt.Println("Egress IPv6 address:", ip.String())
+				}
+				fmt.Println("Egress Port:", event.Addr.Port)
+			case SocketType:
+				fmt.Println("Socket Domain:", SocketDomainMap[event.Socket.Domain])
+				fmt.Println("Socket Type:", SocketTypeMap[event.Socket.Type])
+				fmt.Println("Socket Protocol:", SocketProtocolMap[event.Socket.Protocol])
+			}
+
+		case PtraceType:
+			// Parse the event body of ptrace operation
+			var event bpfPtraceEvent
+			err := binary.Read(bytes.NewBuffer(record.RawSample[EventHeaderSize:]), binary.LittleEndian, &event)
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			fmt.Println("Permission:", ptracePermissionMap[event.Permission])
+			fmt.Println("Externel:", event.External)
+
+		case MountType:
+			// Parse the event body of mount operation
+			var event bpfMountEvent
+			err := binary.Read(bytes.NewBuffer(record.RawSample[EventHeaderSize:]), binary.LittleEndian, &event)
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			flags := []string{}
+			for flag, name := range mountFlagsMap {
+				if event.Flags&flag != 0 {
+					flags = append(flags, name)
+				}
+			}
+
+			for flag, name := range mountBindFlagsMap {
+				if event.Flags&flag == flag {
+					flags = append(flags, name)
+					break
+				}
+			}
+
+			fmt.Println("Path:", unix.ByteSliceToString(event.Path[:]))
+			fmt.Println("FileSystem Type:", unix.ByteSliceToString(event.Type[:]))
+			fmt.Println("Flags:", flags)
 		}
 	}
 
