@@ -213,7 +213,7 @@ int BPF_PROG(varmor_path_link_tail, struct dentry *old_dentry, const struct path
 }
 
 SEC("lsm/path_rename")
-int BPF_PROG(varmor_path_rename_tail, const struct path *old_dir, struct dentry *old_dentry, const struct path *new_dir, struct dentry *new_dentry, const unsigned int flags) {
+int BPF_PROG(varmor_path_rename_tail, const struct path *old_dir, struct dentry *old_dentry, const struct path *new_dir, struct dentry *new_dentry, unsigned int flags) {
   struct buffer *buf = get_buffer();
   if (buf == NULL)
     return 0;

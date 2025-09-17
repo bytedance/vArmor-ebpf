@@ -325,7 +325,7 @@ int BPF_PROG(varmor_path_link, struct dentry *old_dentry, const struct path *new
 }
 
 SEC("lsm/path_rename")
-int BPF_PROG(varmor_path_rename, const struct path *old_dir, struct dentry *old_dentry, const struct path *new_dir, struct dentry *new_dentry, const unsigned int flags) {
+int BPF_PROG(varmor_path_rename, const struct path *old_dir, struct dentry *old_dentry, const struct path *new_dir, struct dentry *new_dentry, unsigned int flags) {
   // Retrieve the current task and its mnt ns id
   struct task_struct *current = (struct task_struct *)bpf_get_current_task();
   u32 mnt_ns = get_task_mnt_ns_id(current);
