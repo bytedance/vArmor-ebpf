@@ -21,17 +21,27 @@ volatile const u32 init_mnt_ns;
 
 // Tail call map (program array) initialized with program pointers.
 struct {
-	__uint(type, BPF_MAP_TYPE_PROG_ARRAY);
-	__type(key, u32);
-	__type(value, u32);
-	__uint(max_entries, 2);
-	__array(values, int());
-} file_progs SEC(".maps") = {
-	.values =
-		{
-			[0] = &varmor_path_link_tail,
-			[1] = &varmor_path_rename_tail,
-		},
+    __uint(type, BPF_MAP_TYPE_PROG_ARRAY);
+    __type(key, u32);
+    __type(value, u32);
+    __uint(max_entries, 1);
+    __array(values, int());
+} link_progs SEC(".maps") = {
+    .values = {
+        [0] = &varmor_path_link_tail,
+    },
+};
+
+struct {
+    __uint(type, BPF_MAP_TYPE_PROG_ARRAY);
+    __type(key, u32);
+    __type(value, u32);
+    __uint(max_entries, 1);
+    __array(values, int());
+} rename_progs SEC(".maps") = {
+    .values = {
+        [0] = &varmor_path_rename_tail,
+    },
 };
 
 SEC("lsm/capable")
@@ -317,7 +327,7 @@ int BPF_PROG(varmor_path_link, struct dentry *old_dentry, const struct path *new
     return 0;
   } else if (*profile_mode == ENFORCE_MODE) {
     // Tail call
-    bpf_tail_call(ctx, &file_progs, 0);
+    bpf_tail_call(ctx, &link_progs, 0);
     return 0;
   } else {
     return 0;
@@ -396,7 +406,7 @@ int BPF_PROG(varmor_path_rename, const struct path *old_dir, struct dentry *old_
     return 0;
   } else if (*profile_mode == ENFORCE_MODE) {
     // Tail call
-    bpf_tail_call(ctx, &file_progs, 1);
+    bpf_tail_call(ctx, &rename_progs, 0);
     return 0;
   } else {
     return 0;
