@@ -45,10 +45,10 @@
 #define ALLOWED_ACTION 0x00000004
 
 // Maximum number of pods per node
-#define PODS_PER_NODE_MAX 110
+#define PODS_PER_NODE_MAX 256
 
 // Maximum containers count supported by BPF enforcer on a node.
-#define OUTER_MAP_ENTRIES_MAX 110
+#define OUTER_MAP_ENTRIES_MAX 256
 
 // Maximum size of the per-CPU array buffer to cache paths and names etc.
 #define BUFFER_MAX PATH_MAX*3
