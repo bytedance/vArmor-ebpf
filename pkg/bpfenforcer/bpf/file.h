@@ -12,7 +12,7 @@
 #include "perms.h"
 
 // Maximum rule count for file access control
-#define FILE_INNER_MAP_ENTRIES_MAX 128
+#define FILE_INNER_MAP_ENTRIES_MAX 64
 
 typedef unsigned int fmode_t;
 
