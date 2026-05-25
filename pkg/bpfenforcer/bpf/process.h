@@ -12,7 +12,7 @@
 #include "perms.h"
 
 // Maximum rule count for execution control
-#define BPRM_INNER_MAP_ENTRIES_MAX 50
+#define BPRM_INNER_MAP_ENTRIES_MAX 64
 
 struct {
   __uint(type, BPF_MAP_TYPE_HASH_OF_MAPS);

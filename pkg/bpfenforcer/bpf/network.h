@@ -13,7 +13,7 @@
 #include "perms.h"
 
 // Maximum rule count for network access control
-#define NET_INNER_MAP_ENTRIES_MAX 50
+#define NET_INNER_MAP_ENTRIES_MAX 64
 // Maximum port count for network address rule
 #define PORTS_COUNT_MAX 16
 
