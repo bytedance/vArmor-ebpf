@@ -21,10 +21,10 @@ import (
 
 const (
 	// The maximum count of rules for policy primitives.
-	MaxBpfFileRuleCount    = 128
-	MaxBpfBprmRuleCount    = 128
-	MaxBpfNetworkRuleCount = 128
-	MaxBpfMountRuleCount   = 128
+	MaxBpfFileRuleCount    = 50
+	MaxBpfBprmRuleCount    = 50
+	MaxBpfNetworkRuleCount = 50
+	MaxBpfMountRuleCount   = 50
 
 	// MaxFilePathPatternLength is the maximum length of path pattern,
 	// it's equal to FILE_PATH_PATTERN_SIZE_MAX in BPF code
