@@ -29,15 +29,15 @@ struct mount_rule {
   unsigned char fstype[FILE_SYSTEM_TYPE_MAX];
 };
 
-static u32 *get_mount_inner_map(u32 mnt_ns) {
+static __always_inline u32 *get_mount_inner_map(u32 mnt_ns) {
   return bpf_map_lookup_elem(&v_mount_outer, &mnt_ns);
 }
 
-static struct mount_rule *get_mount_rule(u32 *vmount_inner, u32 rule_id) {
+static __always_inline struct mount_rule *get_mount_rule(u32 *vmount_inner, u32 rule_id) {
   return bpf_map_lookup_elem(vmount_inner, &rule_id);
 }
 
-static __noinline int prepend_fstype_to_third_block(const char *fstype, struct buffer *buf) {
+static __always_inline int prepend_fstype_to_third_block(const char *fstype, struct buffer *buf) {
   int ret = bpf_probe_read_kernel_str(&(buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX]), FILE_SYSTEM_TYPE_MAX, fstype);
   if (ret < 0) {
     buf->value[PATH_MAX*3-FILE_SYSTEM_TYPE_MAX] = 0;

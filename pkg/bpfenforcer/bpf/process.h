@@ -21,11 +21,11 @@ struct {
   __type(value, u32);
 } v_bprm_outer SEC(".maps");
 
-static u32 *get_bprm_inner_map(u32 mnt_ns) {
+static __always_inline u32 *get_bprm_inner_map(u32 mnt_ns) {
   return bpf_map_lookup_elem(&v_bprm_outer, &mnt_ns);
 }
 
-static struct path_rule *get_bprm_rule(u32 *vbprm_inner, u32 rule_id) {
+static __always_inline struct path_rule *get_bprm_rule(u32 *vbprm_inner, u32 rule_id) {
   return bpf_map_lookup_elem(vbprm_inner, &rule_id);
 }
 

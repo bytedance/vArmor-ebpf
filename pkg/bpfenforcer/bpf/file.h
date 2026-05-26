@@ -29,11 +29,11 @@ struct path_rule {
   struct path_pattern pattern;
 };
 
-static u32 *get_file_inner_map(u32 mnt_ns) {
+static __always_inline u32 *get_file_inner_map(u32 mnt_ns) {
   return bpf_map_lookup_elem(&v_file_outer, &mnt_ns);
 }
 
-static struct path_rule *get_file_rule(u32 *vfile_inner, u32 rule_id) {
+static __always_inline struct path_rule *get_file_rule(u32 *vfile_inner, u32 rule_id) {
   return bpf_map_lookup_elem(vfile_inner, &rule_id);
 }
 
@@ -67,7 +67,7 @@ static __noinline u32 map_file_to_perms(struct file *file) {
   return perms;
 }
 
-static __always_inline int iterate_file_inner_map_for_file(u32 *vfile_inner, struct buffer *buf, struct buffer_offset *offset, u32 requested_perms, u32 mnt_ns) {
+static __noinline int iterate_file_inner_map_for_file(u32 *vfile_inner, struct buffer *buf, struct buffer_offset *offset, u32 requested_perms, u32 mnt_ns) {
   for(int inner_id=0; inner_id<FILE_INNER_MAP_ENTRIES_MAX; inner_id++) {
     // The key of the inner map must start from 0
     struct path_rule *rule = get_file_rule(vfile_inner, inner_id);
