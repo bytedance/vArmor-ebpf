@@ -24,7 +24,7 @@ const (
 	MaxBpfFileRuleCount    = 64
 	MaxBpfBprmRuleCount    = 64
 	MaxBpfNetworkRuleCount = 64
-	MaxBpfMountRuleCount   = 64
+	MaxBpfMountRuleCount   = 50
 
 	// MaxFilePathPatternLength is the maximum length of path pattern,
 	// it's equal to FILE_PATH_PATTERN_SIZE_MAX in BPF code

@@ -11,8 +11,8 @@
 #include "enforcer.h"
 #include "perms.h"
 
-// Maximum rule count for network access control
-#define MOUNT_INNER_MAP_ENTRIES_MAX 64
+// Maximum rule count for mount access control
+#define MOUNT_INNER_MAP_ENTRIES_MAX 50
 
 struct {
   __uint(type, BPF_MAP_TYPE_HASH_OF_MAPS);
