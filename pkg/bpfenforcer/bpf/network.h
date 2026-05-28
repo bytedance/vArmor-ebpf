@@ -65,15 +65,15 @@ struct {
 	__uint(max_entries, PODS_PER_NODE_MAX);
 } v_pod_ip SEC(".maps");
 
-static u32 *get_net_inner_map(u32 mnt_ns) {
+static __always_inline u32 *get_net_inner_map(u32 mnt_ns) {
   return bpf_map_lookup_elem(&v_net_outer, &mnt_ns);
 }
 
-static struct net_rule *get_net_rule(u32 *vnet_inner, u32 rule_id) {
+static __always_inline struct net_rule *get_net_rule(u32 *vnet_inner, u32 rule_id) {
   return bpf_map_lookup_elem(vnet_inner, &rule_id);
 }
 
-static struct pod_ip *get_pod_ip(u32 mnt_ns) {
+static __always_inline struct pod_ip *get_pod_ip(u32 mnt_ns) {
   return bpf_map_lookup_elem(&v_pod_ip, &mnt_ns);
 }
 

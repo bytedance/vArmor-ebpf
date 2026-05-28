@@ -17,6 +17,7 @@
 package bpfenforcer
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc $BPF_CLANG -cflags $BPF_CFLAGS -target bpfel -type audit_event bpf bpf/enforcer.c -- -I../../headers
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc $BPF_CLANG -cflags "$BPF_CFLAGS -DUSE_BPF_LOOP" -target bpfel -type audit_event bpfLoop bpf/enforcer.c -- -I../../headers
 
 import (
 	"bytes"
@@ -28,6 +29,8 @@ import (
 	"strings"
 
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/asm"
+	"github.com/cilium/ebpf/features"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
@@ -36,20 +39,21 @@ import (
 )
 
 type BpfEnforcer struct {
-	objs            bpfObjects
-	capableLink     link.Link
-	openFileLink    link.Link
-	pathSymlinkLink link.Link
-	pathLinkLink    link.Link
-	pathRenameLink  link.Link
-	bprmLink        link.Link
-	sockConnLink    link.Link
-	socketLink      link.Link
-	ptraceLink      link.Link
-	mountLink       link.Link
-	moveMountLink   link.Link
-	umountLink      link.Link
-	log             logr.Logger
+	objs              bpfObjects
+	capableLink       link.Link
+	openFileLink      link.Link
+	pathSymlinkLink   link.Link
+	pathLinkLink      link.Link
+	pathRenameLink    link.Link
+	bprmLink          link.Link
+	sockConnLink      link.Link
+	socketLink        link.Link
+	ptraceLink        link.Link
+	mountLink         link.Link
+	moveMountLink     link.Link
+	umountLink        link.Link
+	maxMountRuleCount uint32
+	log               logr.Logger
 }
 
 func NewBpfEnforcer(log logr.Logger) *BpfEnforcer {
@@ -90,9 +94,32 @@ func (enforcer *BpfEnforcer) InitEBPF() error {
 	}
 
 	enforcer.log.Info("parses the ebpf program into a CollectionSpec")
-	collectionSpec, err := loadBpf()
+	var (
+		collectionSpec *ebpf.CollectionSpec
+		variant        string
+		err            error
+	)
+	// Detect bpf_loop helper availability (kernel >= 5.17).
+	// NOTE: cilium/ebpf v0.20 HaveProgramHelper does not set AttachType for
+	// LSM/Tracing program types, which makes the probe fail with EINVAL.
+	// Use Kprobe as the probe target since helper availability is kernel-wide.
+	if features.HaveProgramHelper(ebpf.Kprobe, asm.FnLoop) == nil {
+		collectionSpec, err = loadBpfLoop()
+		variant = "bpf_loop"
+	} else {
+		collectionSpec, err = loadBpf()
+		variant = "unrolled"
+	}
 	if err != nil {
 		return err
+	}
+	enforcer.log.Info("selected bpf variant", "variant", variant)
+
+	// Set mount rule count based on BPF variant
+	if variant == "bpf_loop" {
+		enforcer.maxMountRuleCount = MaxBpfMountRuleCountBpfLoop
+	} else {
+		enforcer.maxMountRuleCount = MaxBpfMountRuleCountUnrolled
 	}
 
 	fileInnerMap := ebpf.MapSpec{
@@ -127,7 +154,7 @@ func (enforcer *BpfEnforcer) InitEBPF() error {
 		Type:       ebpf.Hash,
 		KeySize:    4,
 		ValueSize:  MountRuleSize,
-		MaxEntries: MaxBpfMountRuleCount,
+		MaxEntries: enforcer.maxMountRuleCount,
 	}
 	collectionSpec.Maps["v_mount_outer"].InnerMap = &mountInnerMap
 
@@ -432,7 +459,7 @@ func (enforcer *BpfEnforcer) SetMountMap(mntNsID uint32, mountRule *bpfMountRule
 		Type:       ebpf.Hash,
 		KeySize:    4,
 		ValueSize:  MountRuleSize,
-		MaxEntries: MaxBpfMountRuleCount,
+		MaxEntries: enforcer.maxMountRuleCount,
 	}
 	innerMap, err := ebpf.NewMap(&innerMapSpec)
 	if err != nil {

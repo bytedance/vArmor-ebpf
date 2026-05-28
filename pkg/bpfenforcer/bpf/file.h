@@ -29,11 +29,11 @@ struct path_rule {
   struct path_pattern pattern;
 };
 
-static u32 *get_file_inner_map(u32 mnt_ns) {
+static __always_inline u32 *get_file_inner_map(u32 mnt_ns) {
   return bpf_map_lookup_elem(&v_file_outer, &mnt_ns);
 }
 
-static struct path_rule *get_file_rule(u32 *vfile_inner, u32 rule_id) {
+static __always_inline struct path_rule *get_file_rule(u32 *vfile_inner, u32 rule_id) {
   return bpf_map_lookup_elem(vfile_inner, &rule_id);
 }
 
@@ -67,7 +67,67 @@ static __noinline u32 map_file_to_perms(struct file *file) {
   return perms;
 }
 
-static __always_inline int iterate_file_inner_map_for_file(u32 *vfile_inner, struct buffer *buf, struct buffer_offset *offset, u32 requested_perms, u32 mnt_ns) {
+#ifdef USE_BPF_LOOP
+// bpf_loop callback context for file rule iteration
+struct file_iter_ctx {
+  u32 *vfile_inner;
+  struct buffer *buf;
+  struct buffer_offset *offset;
+  u32 requested_perms;
+  u32 mnt_ns;
+  int result;
+};
+
+static __noinline long file_iter_cb(u32 idx, struct file_iter_ctx *ctx) {
+  struct path_rule *rule = get_file_rule(ctx->vfile_inner, idx);
+  if (rule == NULL)
+    return 1; // break - no more rules
+
+  if (!(rule->permissions & ctx->requested_perms))
+    return 0; // continue - permission not relevant
+
+  if (!old_path_check(&rule->pattern, ctx->buf, ctx->offset))
+    return 0; // continue - path not matched
+
+  // Submit the audit event
+  if (rule->mode & AUDIT_MODE) {
+    struct audit_event *e;
+    e = bpf_ringbuf_reserve(&v_audit_rb, sizeof(struct audit_event), 0);
+    if (e) {
+      e->action = rule->mode & DENY_MODE ? DENIED_ACTION : AUDIT_ACTION;
+      e->type = FILE_TYPE;
+      e->mnt_ns = ctx->mnt_ns;
+      e->tgid = bpf_get_current_pid_tgid()>>32;
+      e->ktime = bpf_ktime_get_boot_ns();
+      e->event_u.path.permissions = ctx->requested_perms;
+      bpf_probe_read_kernel_str(&e->event_u.path.path, PATH_MAX-ctx->offset->first_path & (PATH_MAX-1), &(ctx->buf->value[ctx->offset->first_path & (PATH_MAX-1)]));
+      bpf_ringbuf_submit(e, 0);
+    }
+  }
+
+  if (rule->mode & DENY_MODE) {
+    ctx->result = -EPERM;
+    return 1; // break - access denied
+  }
+  return 0; // continue - audit-only
+}
+
+static __noinline int iterate_file_inner_map_for_file(u32 *vfile_inner, struct buffer *buf, struct buffer_offset *offset, u32 requested_perms, u32 mnt_ns) {
+  struct file_iter_ctx ctx = {
+    .vfile_inner = vfile_inner,
+    .buf = buf,
+    .offset = offset,
+    .requested_perms = requested_perms,
+    .mnt_ns = mnt_ns,
+    .result = 0,
+  };
+  bpf_loop(FILE_INNER_MAP_ENTRIES_MAX, file_iter_cb, &ctx, 0);
+  // Clamp return value to satisfy LSM verifier constraint [-4095, 0]
+  int ret = ctx.result;
+  return ret > 0 ? 0 : ret < -4095 ? -4095 : ret;
+}
+#else  /* !USE_BPF_LOOP */
+static __noinline int iterate_file_inner_map_for_file(u32 *vfile_inner, struct buffer *buf, struct buffer_offset *offset, u32 requested_perms, u32 mnt_ns) {
   for(int inner_id=0; inner_id<FILE_INNER_MAP_ENTRIES_MAX; inner_id++) {
     // The key of the inner map must start from 0
     struct path_rule *rule = get_file_rule(vfile_inner, inner_id);
@@ -114,6 +174,7 @@ static __always_inline int iterate_file_inner_map_for_file(u32 *vfile_inner, str
   DEBUG_PRINT("access allowed");
   return 0;
 }
+#endif /* USE_BPF_LOOP */
 
 static __noinline int iterate_file_inner_map_for_path_pair(u32 *vfile_inner, struct buffer *buf, struct buffer_offset *offset, u32 requested_perms, u32 mnt_ns) {
   for(int inner_id=0; inner_id<FILE_INNER_MAP_ENTRIES_MAX; inner_id++) {

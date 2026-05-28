@@ -207,20 +207,20 @@ struct path_pattern {
   unsigned char suffix[FILE_PATH_PATTERN_SIZE_MAX];
 };
 
-static struct buffer *get_buffer() {
+static __always_inline struct buffer *get_buffer() {
     int index = 0;
     return bpf_map_lookup_elem(&v_buffer, &index);
 }
 
-static u32 get_task_mnt_ns_id(struct task_struct *task) {
+static __always_inline u32 get_task_mnt_ns_id(struct task_struct *task) {
   return BPF_CORE_READ(task, nsproxy, mnt_ns, ns).inum;
 }
 
-static struct user_namespace *get_task_user_ns(struct task_struct *task) {
+static __always_inline struct user_namespace *get_task_user_ns(struct task_struct *task) {
   return BPF_CORE_READ(task, cred, user_ns);
 }
 
-static kernel_cap_t get_task_cap_effective(struct task_struct *task) {
+static __always_inline kernel_cap_t get_task_cap_effective(struct task_struct *task) {
   return BPF_CORE_READ(task, cred, cap_effective);
 }
 
@@ -232,7 +232,7 @@ static kernel_cap_t get_task_cap_effective(struct task_struct *task) {
 //   return BPF_CORE_READ(task, mm, exe_file);
 // }
 
-static int task_in_execve(struct task_struct *task) {
+static __always_inline int task_in_execve(struct task_struct *task) {
   unsigned long long val = 0;
   unsigned int offset = __builtin_preserve_field_info(task->in_execve, BPF_FIELD_BYTE_OFFSET);
   unsigned int size = __builtin_preserve_field_info(task->in_execve, BPF_FIELD_BYTE_SIZE);
@@ -242,7 +242,7 @@ static int task_in_execve(struct task_struct *task) {
   return (int)val;
 }
 
-static inline struct mount *real_mount(struct vfsmount *mnt) {
+static __always_inline struct mount *real_mount(struct vfsmount *mnt) {
   return container_of(mnt, struct mount, mnt);
 }
 
@@ -445,7 +445,7 @@ static __noinline bool is_suffix_match(unsigned char *suffix, unsigned char *pat
   return true;
 }
 
-static __always_inline bool old_path_check(struct path_pattern *pattern, struct buffer *buf, struct buffer_offset *offset) {
+static __noinline bool old_path_check(struct path_pattern *pattern, struct buffer *buf, struct buffer_offset *offset) {
 
   DEBUG_PRINT("old_path_check() - pattern flags: 0x%x", pattern->flags);
 
