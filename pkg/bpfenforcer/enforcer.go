@@ -17,6 +17,7 @@
 package bpfenforcer
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc $BPF_CLANG -cflags $BPF_CFLAGS -target bpfel -type audit_event bpf bpf/enforcer.c -- -I../../headers
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc $BPF_CLANG -cflags "$BPF_CFLAGS -DUSE_BPF_LOOP" -target bpfel -type audit_event bpfLoop bpf/enforcer.c -- -I../../headers
 
 import (
 	"bytes"
@@ -28,6 +29,8 @@ import (
 	"strings"
 
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/asm"
+	"github.com/cilium/ebpf/features"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
@@ -90,10 +93,26 @@ func (enforcer *BpfEnforcer) InitEBPF() error {
 	}
 
 	enforcer.log.Info("parses the ebpf program into a CollectionSpec")
-	collectionSpec, err := loadBpf()
+	var (
+		collectionSpec *ebpf.CollectionSpec
+		variant        string
+		err            error
+	)
+	// Detect bpf_loop helper availability (kernel >= 5.17).
+	// NOTE: cilium/ebpf v0.20 HaveProgramHelper does not set AttachType for
+	// LSM/Tracing program types, which makes the probe fail with EINVAL.
+	// Use Kprobe as the probe target since helper availability is kernel-wide.
+	if features.HaveProgramHelper(ebpf.Kprobe, asm.FnLoop) == nil {
+		collectionSpec, err = loadBpfLoop()
+		variant = "bpf_loop"
+	} else {
+		collectionSpec, err = loadBpf()
+		variant = "unrolled"
+	}
 	if err != nil {
 		return err
 	}
+	enforcer.log.Info("selected bpf variant", "variant", variant)
 
 	fileInnerMap := ebpf.MapSpec{
 		Name:       "v_file_inner_",
