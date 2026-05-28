@@ -24,7 +24,14 @@ const (
 	MaxBpfFileRuleCount    = 64
 	MaxBpfBprmRuleCount    = 64
 	MaxBpfNetworkRuleCount = 64
-	MaxBpfMountRuleCount   = 50
+	// MaxBpfMountRuleCount is the maximum mount rule count (largest supported value).
+	MaxBpfMountRuleCount = 64
+	// MaxBpfMountRuleCountUnrolled is the mount rule limit for the unrolled BPF variant
+	// (kernels < 5.17 that do not support bpf_loop).
+	MaxBpfMountRuleCountUnrolled = 50
+	// MaxBpfMountRuleCountBpfLoop is the mount rule limit for the bpf_loop variant
+	// (kernels >= 5.17).
+	MaxBpfMountRuleCountBpfLoop = 64
 
 	// MaxFilePathPatternLength is the maximum length of path pattern,
 	// it's equal to FILE_PATH_PATTERN_SIZE_MAX in BPF code

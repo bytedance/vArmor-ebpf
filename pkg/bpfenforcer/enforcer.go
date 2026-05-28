@@ -39,20 +39,21 @@ import (
 )
 
 type BpfEnforcer struct {
-	objs            bpfObjects
-	capableLink     link.Link
-	openFileLink    link.Link
-	pathSymlinkLink link.Link
-	pathLinkLink    link.Link
-	pathRenameLink  link.Link
-	bprmLink        link.Link
-	sockConnLink    link.Link
-	socketLink      link.Link
-	ptraceLink      link.Link
-	mountLink       link.Link
-	moveMountLink   link.Link
-	umountLink      link.Link
-	log             logr.Logger
+	objs              bpfObjects
+	capableLink       link.Link
+	openFileLink      link.Link
+	pathSymlinkLink   link.Link
+	pathLinkLink      link.Link
+	pathRenameLink    link.Link
+	bprmLink          link.Link
+	sockConnLink      link.Link
+	socketLink        link.Link
+	ptraceLink        link.Link
+	mountLink         link.Link
+	moveMountLink     link.Link
+	umountLink        link.Link
+	maxMountRuleCount uint32
+	log               logr.Logger
 }
 
 func NewBpfEnforcer(log logr.Logger) *BpfEnforcer {
@@ -114,6 +115,13 @@ func (enforcer *BpfEnforcer) InitEBPF() error {
 	}
 	enforcer.log.Info("selected bpf variant", "variant", variant)
 
+	// Set mount rule count based on BPF variant
+	if variant == "bpf_loop" {
+		enforcer.maxMountRuleCount = MaxBpfMountRuleCountBpfLoop
+	} else {
+		enforcer.maxMountRuleCount = MaxBpfMountRuleCountUnrolled
+	}
+
 	fileInnerMap := ebpf.MapSpec{
 		Name:       "v_file_inner_",
 		Type:       ebpf.Hash,
@@ -146,7 +154,7 @@ func (enforcer *BpfEnforcer) InitEBPF() error {
 		Type:       ebpf.Hash,
 		KeySize:    4,
 		ValueSize:  MountRuleSize,
-		MaxEntries: MaxBpfMountRuleCount,
+		MaxEntries: enforcer.maxMountRuleCount,
 	}
 	collectionSpec.Maps["v_mount_outer"].InnerMap = &mountInnerMap
 
@@ -451,7 +459,7 @@ func (enforcer *BpfEnforcer) SetMountMap(mntNsID uint32, mountRule *bpfMountRule
 		Type:       ebpf.Hash,
 		KeySize:    4,
 		ValueSize:  MountRuleSize,
-		MaxEntries: MaxBpfMountRuleCount,
+		MaxEntries: enforcer.maxMountRuleCount,
 	}
 	innerMap, err := ebpf.NewMap(&innerMapSpec)
 	if err != nil {
